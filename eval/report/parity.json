@@ -1,7 +1,7 @@
 {
   "versions": {
     "ax": "ax 0.1.0",
-    "ax commit": "eb2d6bb",
+    "ax commit": "f99b4c8",
     "rg": "ripgrep 14.1.0",
     "repos": "hono@ee0622e144, ripgrep@3fce3b5bb0, requests@611c6162cb, cobra@adbc881390, ax@HEAD"
   },
@@ -1246,8 +1246,8 @@
       "repo": "ax",
       "tool": "find",
       "args": [],
-      "rg_count": 36,
-      "ax_count": 36,
+      "rg_count": 99,
+      "ax_count": 99,
       "only_rg": [],
       "only_ax": [],
       "ok": true
@@ -1258,8 +1258,8 @@
       "args": [
         "*.md"
       ],
-      "rg_count": 3,
-      "ax_count": 3,
+      "rg_count": 6,
+      "ax_count": 6,
       "only_rg": [],
       "only_ax": [],
       "ok": true
@@ -1270,8 +1270,8 @@
       "args": [
         "**/*test*"
       ],
-      "rg_count": 2,
-      "ax_count": 2,
+      "rg_count": 9,
+      "ax_count": 9,
       "only_rg": [],
       "only_ax": [],
       "ok": true
@@ -1282,8 +1282,8 @@
       "args": [
         "!*.md"
       ],
-      "rg_count": 33,
-      "ax_count": 33,
+      "rg_count": 93,
+      "ax_count": 93,
       "only_rg": [],
       "only_ax": [],
       "ok": true
@@ -1307,8 +1307,8 @@
         "-i",
         "error"
       ],
-      "rg_count": 69,
-      "ax_count": 69,
+      "rg_count": 262,
+      "ax_count": 262,
       "only_rg": [],
       "only_ax": [],
       "ok": true
@@ -1320,8 +1320,8 @@
         "-w",
         "self"
       ],
-      "rg_count": 52,
-      "ax_count": 52,
+      "rg_count": 104,
+      "ax_count": 104,
       "only_rg": [],
       "only_ax": [],
       "ok": true
@@ -1333,8 +1333,8 @@
         "-w",
         "c"
       ],
-      "rg_count": 117,
-      "ax_count": 117,
+      "rg_count": 380,
+      "ax_count": 380,
       "only_rg": [],
       "only_ax": [],
       "ok": true
@@ -1346,8 +1346,8 @@
         "-F",
         "()"
       ],
-      "rg_count": 1003,
-      "ax_count": 1003,
+      "rg_count": 2323,
+      "ax_count": 2323,
       "only_rg": [],
       "only_ax": [],
       "ok": true
@@ -1359,8 +1359,8 @@
         "-F",
         "."
       ],
-      "rg_count": 1890,
-      "ax_count": 1890,
+      "rg_count": 22794,
+      "ax_count": 22794,
       "only_rg": [],
       "only_ax": [],
       "ok": true
@@ -1371,8 +1371,8 @@
       "args": [
         "return\\s+\\w+"
       ],
-      "rg_count": 56,
-      "ax_count": 56,
+      "rg_count": 357,
+      "ax_count": 357,
       "only_rg": [],
       "only_ax": [],
       "ok": true
@@ -1383,8 +1383,8 @@
       "args": [
         "^\\s*(pub )?fn "
       ],
-      "rg_count": 172,
-      "ax_count": 172,
+      "rg_count": 311,
+      "ax_count": 311,
       "only_rg": [],
       "only_ax": [],
       "ok": true
@@ -1396,8 +1396,8 @@
         "-S",
         "Err"
       ],
-      "rg_count": 46,
-      "ax_count": 46,
+      "rg_count": 206,
+      "ax_count": 206,
       "only_rg": [],
       "only_ax": [],
       "ok": true
@@ -1409,8 +1409,8 @@
         "-S",
         "err"
       ],
-      "rg_count": 117,
-      "ax_count": 117,
+      "rg_count": 415,
+      "ax_count": 415,
       "only_rg": [],
       "only_ax": [],
       "ok": true
@@ -1423,8 +1423,8 @@
         "*.md",
         "the"
       ],
-      "rg_count": 21,
-      "ax_count": 21,
+      "rg_count": 50,
+      "ax_count": 50,
       "only_rg": [],
       "only_ax": [],
       "ok": true
@@ -1437,8 +1437,8 @@
         "!*.md",
         "the"
       ],
-      "rg_count": 134,
-      "ax_count": 134,
+      "rg_count": 506,
+      "ax_count": 506,
       "only_rg": [],
       "only_ax": [],
       "ok": true
@@ -1451,8 +1451,8 @@
         "rust",
         "impl"
       ],
-      "rg_count": 19,
-      "ax_count": 19,
+      "rg_count": 29,
+      "ax_count": 29,
       "only_rg": [],
       "only_ax": [],
       "ok": true
@@ -1465,8 +1465,8 @@
         "py",
         "def"
       ],
-      "rg_count": 22,
-      "ax_count": 22,
+      "rg_count": 114,
+      "ax_count": 114,
       "only_rg": [],
       "only_ax": [],
       "ok": true
@@ -1532,8 +1532,8 @@
         "-l",
         "test"
       ],
-      "rg_count": 25,
-      "ax_count": 25,
+      "rg_count": 60,
+      "ax_count": 60,
       "only_rg": [],
       "only_ax": [],
       "ok": true
@@ -1545,8 +1545,8 @@
         "-c",
         "test"
       ],
-      "rg_count": 25,
-      "ax_count": 25,
+      "rg_count": 60,
+      "ax_count": 60,
       "only_rg": [],
       "only_ax": [],
       "ok": true
@@ -1556,181 +1556,181 @@
     {
       "repo": "hono",
       "case": "files",
-      "ax_mean_ms": 4.019929193232176,
-      "ax_stddev_ms": 0.19958379692216466,
-      "rg_mean_ms": 5.261937792338314,
-      "rg_stddev_ms": 0.6160346857206235,
+      "ax_mean_ms": 4.303945099389312,
+      "ax_stddev_ms": 0.651799718879624,
+      "rg_mean_ms": 5.218023428421054,
+      "rg_stddev_ms": 0.6408197769413904,
       "raw": "report/hyperfine/hono-files.json"
     },
     {
       "repo": "hono",
       "case": "grep literal",
-      "ax_mean_ms": 14.439979283232322,
-      "ax_stddev_ms": 0.23783916583101788,
-      "rg_mean_ms": 6.280837016306306,
-      "rg_stddev_ms": 0.6295964408497062,
+      "ax_mean_ms": 8.808431155308636,
+      "ax_stddev_ms": 0.2760560098511205,
+      "rg_mean_ms": 6.272338434004578,
+      "rg_stddev_ms": 0.6586843236300759,
       "raw": "report/hyperfine/hono-grep-literal.json"
     },
     {
       "repo": "hono",
       "case": "grep regex",
-      "ax_mean_ms": 15.617468852903224,
-      "ax_stddev_ms": 0.4363344329400158,
-      "rg_mean_ms": 11.04263066277992,
-      "rg_stddev_ms": 0.630517449710576,
+      "ax_mean_ms": 15.315172984467003,
+      "ax_stddev_ms": 0.7862423412535481,
+      "rg_mean_ms": 11.054379379848486,
+      "rg_stddev_ms": 0.6752969886866277,
       "raw": "report/hyperfine/hono-grep-regex.json"
     },
     {
       "repo": "hono",
       "case": "grep -i word",
-      "ax_mean_ms": 21.495234726764707,
-      "ax_stddev_ms": 0.38569316428915845,
-      "rg_mean_ms": 6.47187134,
-      "rg_stddev_ms": 0.632828312197318,
+      "ax_mean_ms": 12.196322211999988,
+      "ax_stddev_ms": 1.4625462224853714,
+      "rg_mean_ms": 6.3751315886747,
+      "rg_stddev_ms": 0.5560520914598902,
       "raw": "report/hyperfine/hono-grep--i-word.json"
     },
     {
       "repo": "ripgrep",
       "case": "files",
-      "ax_mean_ms": 2.902242079640857,
-      "ax_stddev_ms": 0.18469573876850318,
-      "rg_mean_ms": 4.927349104323485,
-      "rg_stddev_ms": 0.6470019032589209,
+      "ax_mean_ms": 2.856269534585152,
+      "ax_stddev_ms": 0.24533490655791673,
+      "rg_mean_ms": 4.943623597693525,
+      "rg_stddev_ms": 0.6364347794841289,
       "raw": "report/hyperfine/ripgrep-files.json"
     },
     {
       "repo": "ripgrep",
       "case": "grep literal",
-      "ax_mean_ms": 4.241065120318465,
-      "ax_stddev_ms": 0.26455678235306274,
-      "rg_mean_ms": 5.499452732802771,
-      "rg_stddev_ms": 0.5969000762875072,
+      "ax_mean_ms": 3.614211099709725,
+      "ax_stddev_ms": 0.12844416007177648,
+      "rg_mean_ms": 5.4760149365187685,
+      "rg_stddev_ms": 0.5836590770979435,
       "raw": "report/hyperfine/ripgrep-grep-literal.json"
     },
     {
       "repo": "ripgrep",
       "case": "grep regex",
-      "ax_mean_ms": 9.833453549122805,
-      "ax_stddev_ms": 0.20448485430904298,
-      "rg_mean_ms": 10.295315170631966,
-      "rg_stddev_ms": 0.5991034544143815,
+      "ax_mean_ms": 8.994819281604938,
+      "ax_stddev_ms": 0.6336620455245002,
+      "rg_mean_ms": 10.293042209122811,
+      "rg_stddev_ms": 0.606687649793894,
       "raw": "report/hyperfine/ripgrep-grep-regex.json"
     },
     {
       "repo": "ripgrep",
       "case": "grep -i word",
-      "ax_mean_ms": 7.116522067500001,
-      "ax_stddev_ms": 0.2024051035835599,
-      "rg_mean_ms": 5.691579072340429,
-      "rg_stddev_ms": 0.58579253043249,
+      "ax_mean_ms": 6.133474514989195,
+      "ax_stddev_ms": 0.30446091879708437,
+      "rg_mean_ms": 5.59463332468547,
+      "rg_stddev_ms": 0.5312543090665094,
       "raw": "report/hyperfine/ripgrep-grep--i-word.json"
     },
     {
       "repo": "requests",
       "case": "files",
-      "ax_mean_ms": 2.0764564500423375,
-      "ax_stddev_ms": 0.1739569717518081,
-      "rg_mean_ms": 3.1074081631701658,
-      "rg_stddev_ms": 0.4249003030822724,
+      "ax_mean_ms": 2.126797929820553,
+      "ax_stddev_ms": 0.20979315476017535,
+      "rg_mean_ms": 3.2421781036848216,
+      "rg_stddev_ms": 0.5848178258599187,
       "raw": "report/hyperfine/requests-files.json"
     },
     {
       "repo": "requests",
       "case": "grep literal",
-      "ax_mean_ms": 7.512424998612716,
-      "ax_stddev_ms": 0.22306086819307303,
-      "rg_mean_ms": 4.643021870803858,
-      "rg_stddev_ms": 0.5173867353967224,
+      "ax_mean_ms": 6.959265693419913,
+      "ax_stddev_ms": 1.1155311971553274,
+      "rg_mean_ms": 5.115737788278142,
+      "rg_stddev_ms": 1.4115248657001083,
       "raw": "report/hyperfine/requests-grep-literal.json"
     },
     {
       "repo": "requests",
       "case": "grep regex",
-      "ax_mean_ms": 14.371342032682923,
-      "ax_stddev_ms": 0.2639336491993853,
-      "rg_mean_ms": 9.609298745144692,
-      "rg_stddev_ms": 0.6033722632737016,
+      "ax_mean_ms": 12.363317671111112,
+      "ax_stddev_ms": 0.9781217926142286,
+      "rg_mean_ms": 10.416567448854966,
+      "rg_stddev_ms": 1.693188065224186,
       "raw": "report/hyperfine/requests-grep-regex.json"
     },
     {
       "repo": "requests",
       "case": "grep -i word",
-      "ax_mean_ms": 33.04479509111109,
-      "ax_stddev_ms": 0.8034424517847972,
-      "rg_mean_ms": 4.834120695324165,
-      "rg_stddev_ms": 0.5182136974001738,
+      "ax_mean_ms": 26.891700509593516,
+      "ax_stddev_ms": 2.6308334489987426,
+      "rg_mean_ms": 4.963712380512818,
+      "rg_stddev_ms": 0.5245795220452506,
       "raw": "report/hyperfine/requests-grep--i-word.json"
     },
     {
       "repo": "cobra",
       "case": "files",
-      "ax_mean_ms": 2.281224971172787,
-      "ax_stddev_ms": 0.17465734748259387,
-      "rg_mean_ms": 3.134966739578452,
-      "rg_stddev_ms": 0.4339522073776514,
+      "ax_mean_ms": 2.3797086484488457,
+      "ax_stddev_ms": 0.5449742837212973,
+      "rg_mean_ms": 3.3653503835023035,
+      "rg_stddev_ms": 0.6018933179240816,
       "raw": "report/hyperfine/cobra-files.json"
     },
     {
       "repo": "cobra",
       "case": "grep literal",
-      "ax_mean_ms": 5.323991388502027,
-      "ax_stddev_ms": 0.18475273385937838,
-      "rg_mean_ms": 4.4344369607309,
-      "rg_stddev_ms": 0.47039022386173224,
+      "ax_mean_ms": 5.123338857935942,
+      "ax_stddev_ms": 0.7728183717991823,
+      "rg_mean_ms": 4.517321902044729,
+      "rg_stddev_ms": 0.5264334492139163,
       "raw": "report/hyperfine/cobra-grep-literal.json"
     },
     {
       "repo": "cobra",
       "case": "grep regex",
-      "ax_mean_ms": 12.539544665217395,
-      "ax_stddev_ms": 0.22427002702607432,
-      "rg_mean_ms": 9.527558423611103,
-      "rg_stddev_ms": 0.5649568532451449,
+      "ax_mean_ms": 12.003093263478254,
+      "ax_stddev_ms": 1.0161343732405594,
+      "rg_mean_ms": 9.7650365061842,
+      "rg_stddev_ms": 0.6780600804457859,
       "raw": "report/hyperfine/cobra-grep-regex.json"
     },
     {
       "repo": "cobra",
       "case": "grep -i word",
-      "ax_mean_ms": 8.144570106590258,
-      "ax_stddev_ms": 0.2485186449624375,
-      "rg_mean_ms": 4.862241323138833,
-      "rg_stddev_ms": 0.5117517492256335,
+      "ax_mean_ms": 8.116875835725192,
+      "ax_stddev_ms": 2.1702115823476205,
+      "rg_mean_ms": 4.948906544730289,
+      "rg_stddev_ms": 0.5284836033034974,
       "raw": "report/hyperfine/cobra-grep--i-word.json"
     },
     {
       "repo": "ax",
       "case": "files",
-      "ax_mean_ms": 1.7663199210714287,
-      "ax_stddev_ms": 0.17678782883273586,
-      "rg_mean_ms": 2.999276349811323,
-      "rg_stddev_ms": 0.3897019837600547,
+      "ax_mean_ms": 2.0021377620408196,
+      "ax_stddev_ms": 0.22278462098414717,
+      "rg_mean_ms": 3.2340731229432205,
+      "rg_stddev_ms": 0.5978533945396174,
       "raw": "report/hyperfine/ax-files.json"
     },
     {
       "repo": "ax",
       "case": "grep literal",
-      "ax_mean_ms": 19.130029460529798,
-      "ax_stddev_ms": 0.2695092688393117,
-      "rg_mean_ms": 3.707953243804341,
-      "rg_stddev_ms": 0.5187636936761754,
+      "ax_mean_ms": 15.286182611881197,
+      "ax_stddev_ms": 1.8979786964386198,
+      "rg_mean_ms": 4.92019500510397,
+      "rg_stddev_ms": 0.5207378735161603,
       "raw": "report/hyperfine/ax-grep-literal.json"
     },
     {
       "repo": "ax",
       "case": "grep regex",
-      "ax_mean_ms": 15.578317756825403,
-      "ax_stddev_ms": 0.20446084182223062,
-      "rg_mean_ms": 8.535087488813566,
-      "rg_stddev_ms": 0.45770160114931135,
+      "ax_mean_ms": 17.23203723939395,
+      "ax_stddev_ms": 1.53036012251693,
+      "rg_mean_ms": 10.608628816666673,
+      "rg_stddev_ms": 3.454332584107443,
       "raw": "report/hyperfine/ax-grep-regex.json"
     },
     {
       "repo": "ax",
       "case": "grep -i word",
-      "ax_mean_ms": 11.43194468796875,
-      "ax_stddev_ms": 0.24701078600199752,
-      "rg_mean_ms": 3.9621383063924074,
-      "rg_stddev_ms": 0.4874003185076287,
+      "ax_mean_ms": 15.359600433114759,
+      "ax_stddev_ms": 3.01206572102448,
+      "rg_mean_ms": 4.957566477914339,
+      "rg_stddev_ms": 0.36776438524142696,
       "raw": "report/hyperfine/ax-grep--i-word.json"
     }
   ]

@@ -1,7 +1,7 @@
 # parity: ax vs rg
 
 - ax: ax 0.1.0
-- ax commit: eb2d6bb
+- ax commit: f99b4c8
 - rg: ripgrep 14.1.0
 - repos: hono@ee0622e144, ripgrep@3fce3b5bb0, requests@611c6162cb, cobra@adbc881390, ax@HEAD
 
@@ -105,52 +105,54 @@
 | cobra | grep | `nothing-should-ever-match-this-zq9` | 0 | 0 | yes |
 | cobra | grep | `-l test` | 32 | 32 | yes |
 | cobra | grep | `-c test` | 32 | 32 | yes |
-| ax | find | `(all)` | 36 | 36 | yes |
-| ax | find | `*.md` | 3 | 3 | yes |
-| ax | find | `**/*test*` | 2 | 2 | yes |
-| ax | find | `!*.md` | 33 | 33 | yes |
+| ax | find | `(all)` | 99 | 99 | yes |
+| ax | find | `*.md` | 6 | 6 | yes |
+| ax | find | `**/*test*` | 9 | 9 | yes |
+| ax | find | `!*.md` | 93 | 93 | yes |
 | ax | grep | `TODO` | 22 | 22 | yes |
-| ax | grep | `-i error` | 69 | 69 | yes |
-| ax | grep | `-w self` | 52 | 52 | yes |
-| ax | grep | `-w c` | 117 | 117 | yes |
-| ax | grep | `-F ()` | 1003 | 1003 | yes |
-| ax | grep | `-F .` | 1890 | 1890 | yes |
-| ax | grep | `return\s+\w+` | 56 | 56 | yes |
-| ax | grep | `^\s*(pub )?fn ` | 172 | 172 | yes |
-| ax | grep | `-S Err` | 46 | 46 | yes |
-| ax | grep | `-S err` | 117 | 117 | yes |
-| ax | grep | `-g *.md the` | 21 | 21 | yes |
-| ax | grep | `-g !*.md the` | 134 | 134 | yes |
-| ax | grep | `-t rust impl` | 19 | 19 | yes |
-| ax | grep | `-t py def` | 22 | 22 | yes |
+| ax | grep | `-i error` | 262 | 262 | yes |
+| ax | grep | `-w self` | 104 | 104 | yes |
+| ax | grep | `-w c` | 380 | 380 | yes |
+| ax | grep | `-F ()` | 2323 | 2323 | yes |
+| ax | grep | `-F .` | 22794 | 22794 | yes |
+| ax | grep | `return\s+\w+` | 357 | 357 | yes |
+| ax | grep | `^\s*(pub )?fn ` | 311 | 311 | yes |
+| ax | grep | `-S Err` | 206 | 206 | yes |
+| ax | grep | `-S err` | 415 | 415 | yes |
+| ax | grep | `-g *.md the` | 50 | 50 | yes |
+| ax | grep | `-g !*.md the` | 506 | 506 | yes |
+| ax | grep | `-t rust impl` | 29 | 29 | yes |
+| ax | grep | `-t py def` | 114 | 114 | yes |
 | ax | grep | `-t go func` | 0 | 0 | yes |
 | ax | grep | `-t ts export` | 0 | 0 | yes |
 | ax | grep | `-C 2 TODO` | 22 | 22 | yes |
 | ax | grep | `nothing-should-ever-match-this-zq9` | 11 | 11 | yes |
-| ax | grep | `-l test` | 25 | 25 | yes |
-| ax | grep | `-c test` | 25 | 25 | yes |
+| ax | grep | `-l test` | 60 | 60 | yes |
+| ax | grep | `-c test` | 60 | 60 | yes |
 
 ## hyperfine (mean ± stddev, ms; raw json alongside)
 
 | repo | case | ax | rg |
 |---|---|---|---|
-| hono | files | 4.0 ± 0.2 | 5.3 ± 0.6 |
-| hono | grep literal | 14.4 ± 0.2 | 6.3 ± 0.6 |
-| hono | grep regex | 15.6 ± 0.4 | 11.0 ± 0.6 |
-| hono | grep -i word | 21.5 ± 0.4 | 6.5 ± 0.6 |
+| hono | files | 4.3 ± 0.7 | 5.2 ± 0.6 |
+| hono | grep literal | 8.8 ± 0.3 | 6.3 ± 0.7 |
+| hono | grep regex | 15.3 ± 0.8 | 11.1 ± 0.7 |
+| hono | grep -i word | 12.2 ± 1.5 | 6.4 ± 0.6 |
 | ripgrep | files | 2.9 ± 0.2 | 4.9 ± 0.6 |
-| ripgrep | grep literal | 4.2 ± 0.3 | 5.5 ± 0.6 |
-| ripgrep | grep regex | 9.8 ± 0.2 | 10.3 ± 0.6 |
-| ripgrep | grep -i word | 7.1 ± 0.2 | 5.7 ± 0.6 |
-| requests | files | 2.1 ± 0.2 | 3.1 ± 0.4 |
-| requests | grep literal | 7.5 ± 0.2 | 4.6 ± 0.5 |
-| requests | grep regex | 14.4 ± 0.3 | 9.6 ± 0.6 |
-| requests | grep -i word | 33.0 ± 0.8 | 4.8 ± 0.5 |
-| cobra | files | 2.3 ± 0.2 | 3.1 ± 0.4 |
-| cobra | grep literal | 5.3 ± 0.2 | 4.4 ± 0.5 |
-| cobra | grep regex | 12.5 ± 0.2 | 9.5 ± 0.6 |
-| cobra | grep -i word | 8.1 ± 0.2 | 4.9 ± 0.5 |
-| ax | files | 1.8 ± 0.2 | 3.0 ± 0.4 |
-| ax | grep literal | 19.1 ± 0.3 | 3.7 ± 0.5 |
-| ax | grep regex | 15.6 ± 0.2 | 8.5 ± 0.5 |
-| ax | grep -i word | 11.4 ± 0.2 | 4.0 ± 0.5 |
+| ripgrep | grep literal | 3.6 ± 0.1 | 5.5 ± 0.6 |
+| ripgrep | grep regex | 9.0 ± 0.6 | 10.3 ± 0.6 |
+| ripgrep | grep -i word | 6.1 ± 0.3 | 5.6 ± 0.5 |
+| requests | files | 2.1 ± 0.2 | 3.2 ± 0.6 |
+| requests | grep literal | 7.0 ± 1.1 | 5.1 ± 1.4 |
+| requests | grep regex | 12.4 ± 1.0 | 10.4 ± 1.7 |
+| requests | grep -i word | 26.9 ± 2.6 | 5.0 ± 0.5 |
+| cobra | files | 2.4 ± 0.5 | 3.4 ± 0.6 |
+| cobra | grep literal | 5.1 ± 0.8 | 4.5 ± 0.5 |
+| cobra | grep regex | 12.0 ± 1.0 | 9.8 ± 0.7 |
+| cobra | grep -i word | 8.1 ± 2.2 | 4.9 ± 0.5 |
+| ax | files | 2.0 ± 0.2 | 3.2 ± 0.6 |
+| ax | grep literal | 15.3 ± 1.9 | 4.9 ± 0.5 |
+| ax | grep regex | 17.2 ± 1.5 | 10.6 ± 3.5 |
+| ax | grep -i word | 15.4 ± 3.0 | 5.0 ± 0.4 |
+
+before/after for parallel grep (old single-threaded numbers next to these): [grep_parallel.md](grep_parallel.md)
