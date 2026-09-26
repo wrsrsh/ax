@@ -99,9 +99,16 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--max", type=int, default=MAX_TASKS)
     a = p.parse_args(argv)
     tasks = [json.loads(l) for l in (TASKS / "tasks.jsonl").read_text().splitlines()]
+    ex = TASKS / "exclude.json"
+    exclude = json.loads(ex.read_text()) if ex.exists() else {}
+    tasks = [t for t in tasks if t["id"] not in exclude]
     rng = random.Random(a.seed)
     if len(tasks) > a.max:
-        tasks = sorted(rng.sample(tasks, a.max), key=lambda t: t["id"])
+        # keep the previous selection; only the gaps left by exclusions get refilled
+        final = TASKS / "final.jsonl"
+        keep = {json.loads(l)["id"] for l in final.read_text().splitlines()} - set(exclude) if final.exists() else set()
+        pool = [t for t in tasks if t["id"] not in keep]
+        tasks = sorted([t for t in tasks if t["id"] in keep] + rng.sample(pool, a.max - len(keep)), key=lambda t: t["id"])
     rw = TASKS / "rewrites.json"
     rewrites = json.loads(rw.read_text()) if rw.exists() else {}
     sets = split(tasks, a.dev, a.seed)

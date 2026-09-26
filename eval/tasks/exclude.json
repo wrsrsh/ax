@@ -1,0 +1,7 @@
+{
+  "hono-5133": "bug in the instruction is already fixed at base; the only f2p test covers cloneRawRequest, which the text never mentions (audit)",
+  "hono-5196": "instruction asks for an opt-in option with unchanged defaults; the test needs the default behaviour to change (audit)",
+  "hono-5171": "378-line router restructure whose tests need new matching behaviour the PR text says doesn't change (audit)",
+  "hono-5199": "same bug and function as hono-5205, whose fix passes this task's test too (audit)",
+  "hono-5329": "test asserts Array.prototype.findIndex is called zero times, which pins one implementation (audit)"
+}
