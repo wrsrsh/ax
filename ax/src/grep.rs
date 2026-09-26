@@ -14,6 +14,7 @@ use grep::regex::RegexMatcherBuilder;
 use grep::searcher::{BinaryDetection, SearcherBuilder, Sink, SinkContext, SinkMatch};
 use serde_json::json;
 use std::collections::BTreeMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[derive(Debug, Clone, Default)]
 pub struct GrepArgs {
@@ -82,12 +83,12 @@ pub fn run(ctx: &Ctx, a: &GrepArgs) -> Result<Report> {
         .word(a.word)
         .build(&a.pattern)
         .map_err(|e| AxError(format!("bad pattern: {e}")))?;
-    let mut searcher = SearcherBuilder::new()
+    let mut searcher = SearcherBuilder::new();
+    searcher
         .binary_detection(BinaryDetection::quit(b'\x00'))
         .line_number(true)
         .before_context(a.context)
-        .after_context(a.context)
-        .build();
+        .after_context(a.context);
 
     let opts = WalkOpts {
         roots: a.within.clone(),
@@ -98,14 +99,20 @@ pub fn run(ctx: &Ctx, a: &GrepArgs) -> Result<Report> {
     let files = walk::files(ctx, &opts)?;
     let n_searched = files.len();
 
+    let threads = threads();
+    let found = par_map(threads, 16, &files, &|| searcher.build(), &|s, e| {
+        let mut sink = Collect::default();
+        // unreadable file: rg warns and moves on, so do we
+        s.search_path(&matcher, &e.abs, &mut sink)
+            .ok()
+            .map(|_| sink)
+    });
+
     // (rel, abs, lines)
     let mut per_file: Vec<(String, std::path::PathBuf, Collect)> = Vec::new();
     let mut binary_skipped = 0;
-    for e in files {
-        let mut sink = Collect::default();
-        if searcher.search_path(&matcher, &e.abs, &mut sink).is_err() {
-            continue; // unreadable file: rg warns and moves on, so do we
-        }
+    for (e, sink) in files.into_iter().zip(found) {
+        let Some(sink) = sink else { continue };
         if sink.matches > 0 {
             per_file.push((e.rel, e.abs, sink));
         } else if sink.binary {
@@ -157,27 +164,39 @@ pub fn run(ctx: &Ctx, a: &GrepArgs) -> Result<Report> {
     } else {
         // cap on matching lines; context lines ride along with their match
         let cap = ctx.cfg.hit_cap().unwrap_or(usize::MAX);
-        let mut shown_hits = 0;
-        let mut out: Vec<Hit> = Vec::new();
-        'files: for (rel, abs, c) in &per_file {
-            if shown_hits >= cap {
+        // merge only the files we'll show something from (those that start
+        // below the cap); only these get parsed for symbols
+        let mut merged: Vec<BTreeMap<usize, (Vec<u8>, bool)>> = Vec::new();
+        let mut before = 0;
+        for (_, _, c) in &per_file {
+            if before >= cap {
                 break;
             }
-            let src = std::fs::read(abs).unwrap_or_default();
-            let syms = hits::symbols_for(&ctx.cfg, rel, &src);
             let mut lines: BTreeMap<usize, (Vec<u8>, bool)> = BTreeMap::new();
             for (n, b, is_ctx) in &c.lines {
                 // a line can be both context (for one hit) and a match; match wins
                 let e = lines.entry(*n).or_insert((b.clone(), *is_ctx));
                 e.1 &= *is_ctx;
             }
+            before += lines.values().filter(|(_, is_ctx)| !is_ctx).count();
+            merged.push(lines);
+        }
+        let shown = &per_file[..merged.len()];
+        let syms = par_map(threads, 1, shown, &|| (), &|_, (rel, abs, _)| {
+            let src = std::fs::read(abs).unwrap_or_default();
+            hits::symbols_for(&ctx.cfg, rel, &src)
+        });
+
+        let mut shown_hits = 0;
+        let mut out: Vec<Hit> = Vec::new();
+        'files: for (((rel, _, _), lines), syms) in shown.iter().zip(merged).zip(&syms) {
             let mut pending_ctx: Vec<Hit> = Vec::new();
             for (n, (b, is_ctx)) in lines {
                 let h = Hit {
                     rel: rel.clone(),
                     line: n,
                     bytes: b,
-                    symbol: crate::syntax::enclosing(&syms, n).cloned(),
+                    symbol: crate::syntax::enclosing(syms, n).cloned(),
                     context: is_ctx,
                 };
                 if is_ctx {
@@ -223,4 +242,62 @@ pub fn run(ctx: &Ctx, a: &GrepArgs) -> Result<Report> {
         ));
     }
     Ok(r)
+}
+
+/// worker count: `AX_THREADS` if set (1 = no threads), else one per core.
+fn threads() -> usize {
+    std::env::var("AX_THREADS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .filter(|&n| n > 0)
+        .or_else(|| std::thread::available_parallelism().ok().map(|n| n.get()))
+        .unwrap_or(1)
+}
+
+/// `items.iter().map(f)` on up to `threads` scoped threads, results in input
+/// order. workers pull `batch` items at a time off a shared counter so one slow file
+/// doesn't stall a whole chunk; `init` makes each worker's scratch state.
+fn par_map<T: Sync, S, R: Send>(
+    threads: usize,
+    batch: usize,
+    items: &[T],
+    init: &(dyn Fn() -> S + Sync),
+    f: &(dyn Fn(&mut S, &T) -> R + Sync),
+) -> Vec<R> {
+    let threads = threads.min(items.len().div_ceil(batch));
+    if threads <= 1 {
+        let mut s = init();
+        return items.iter().map(|t| f(&mut s, t)).collect();
+    }
+    let next = AtomicUsize::new(0);
+    let mut slots: Vec<Option<R>> = std::iter::repeat_with(|| None).take(items.len()).collect();
+    std::thread::scope(|scope| {
+        let workers: Vec<_> = (0..threads)
+            .map(|_| {
+                scope.spawn(|| {
+                    let mut s = init();
+                    let mut done = Vec::new();
+                    loop {
+                        let lo = next.fetch_add(batch, Ordering::Relaxed);
+                        if lo >= items.len() {
+                            break done;
+                        }
+                        let hi = (lo + batch).min(items.len());
+                        for (i, t) in items[lo..hi].iter().enumerate() {
+                            done.push((lo + i, f(&mut s, t)));
+                        }
+                    }
+                })
+            })
+            .collect();
+        for w in workers {
+            for (i, r) in w.join().expect("grep worker panicked") {
+                slots[i] = Some(r);
+            }
+        }
+    });
+    slots
+        .into_iter()
+        .map(|r| r.expect("every slot filled"))
+        .collect()
 }
