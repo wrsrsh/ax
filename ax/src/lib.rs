@@ -8,6 +8,7 @@ pub mod hash;
 pub mod help;
 pub mod hits;
 pub mod map;
+pub mod nearmiss;
 pub mod output;
 pub mod patch;
 pub mod read;

@@ -221,7 +221,7 @@ fn parse_unified(lines: &[&str]) -> Result<Vec<FilePatch>> {
             let (os, mut oc, mut nc) = hunk_counts(lines[i])
                 .ok_or_else(|| perr(format!("bad hunk header {:?}", lines[i])))?;
             let mut hunk = Hunk {
-                hint: Some(os.max(1)),
+                hint: Some(os),
                 ..Default::default()
             };
             i += 1;
@@ -286,24 +286,31 @@ fn parse_unified(lines: &[&str]) -> Result<Vec<FilePatch>> {
     Ok(out)
 }
 
-/// where `hunk.old` sits in `doc`, searching from `from`.
+fn content(doc: &Doc, i: usize) -> &[u8] {
+    let c = &doc.lines[i].0;
+    if i == 0 {
+        c.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(c)
+    } else {
+        c
+    }
+}
+
+/// where `hunk.old` sits in `doc`, searching from `from`. a BOM is invisible.
 fn locate(doc: &Doc, hunk: &Hunk, from: usize) -> Option<usize> {
     let n = doc.lines.len();
     let k = hunk.old.len();
-    let at = |i: usize| {
-        i + k <= n
-            && doc.lines[i..i + k]
-                .iter()
-                .zip(&hunk.old)
-                .all(|((c, _), o)| c == o)
-    };
+    let at = |i: usize| i + k <= n && (0..k).all(|j| content(doc, i + j) == hunk.old[j].as_slice());
     let mut start = from;
     if let Some(s) = &hunk.seek {
-        let found = (from..n).find(|&i| memchr::memmem::find(&doc.lines[i].0, s).is_some())?;
+        let found = (from..n).find(|&i| memchr::memmem::find(content(doc, i), s).is_some())?;
         start = found + 1;
+        if k == 0 {
+            return Some(start);
+        }
     }
     if k == 0 {
-        return Some(hunk.hint.map_or(n, |h| (h).min(n)).max(start));
+        // unified `@@ -h,0` inserts after line h (h = 0: at the top)
+        return Some(hunk.hint.map_or(n, |h| h.min(n)).max(start));
     }
     if let Some(h) = hunk.hint {
         let h = h.saturating_sub(1);
@@ -343,9 +350,22 @@ fn apply_hunks(ctx: &Ctx, rel: &str, src: &[u8], hunks: &[Hunk]) -> Result<Patch
             for o in h.old.iter().take(8) {
                 msg.push_str(&format!("  {}\n", String::from_utf8_lossy(o)));
             }
-            msg.push_str("current lines there:\n");
-            msg.push_str(&crate::edit::around(&ctx.cfg, src, near, 4).join("\n"));
-            return Err(AxError(msg));
+            let contents: Vec<&[u8]> = (0..doc.lines.len()).map(|i| content(&doc, i)).collect();
+            let want: Vec<&[u8]> = h.old.iter().map(Vec::as_slice).collect();
+            let close = crate::nearmiss::candidates(&contents, &want, 3);
+            if let Some(c) = close.first() {
+                msg.push_str(&format!("closest: {}. the real lines:\n", c.why));
+                for c in &close {
+                    for l in c.start + 1..=c.start + c.len {
+                        msg.push_str(&crate::edit::around(&ctx.cfg, src, l, 0).join("\n"));
+                        msg.push('\n');
+                    }
+                }
+            } else {
+                msg.push_str("nothing close either. current lines there:\n");
+                msg.push_str(&crate::edit::around(&ctx.cfg, src, near, 4).join("\n"));
+            }
+            return Err(AxError(msg.trim_end().to_string()));
         };
         out.extend(doc.lines[cursor..at].iter().cloned());
         regions.push((out.len(), h.new.len()));

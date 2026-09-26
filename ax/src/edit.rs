@@ -70,7 +70,14 @@ pub enum Refusal {
         candidates: Vec<usize>,
     },
     /// find text: 0 or >1 occurrences
-    FindCount { count: usize, preview: String },
+    FindCount {
+        count: usize,
+        preview: String,
+        /// 1-based lines of the occurrences (count > 1)
+        lines: Vec<usize>,
+        /// near misses (count == 0)
+        near: Vec<crate::nearmiss::Candidate>,
+    },
     /// two ops touch the same lines
     Overlap(String),
     /// the result doesn't parse where the original did (see parse guard)
@@ -280,8 +287,12 @@ impl Doc {
         self.lines.last().is_none_or(|(_, t)| !t.is_empty())
     }
 
+    /// a BOM the file had is put back even if an edit replaced line 1.
     pub fn render(&self) -> Vec<u8> {
         let mut out = Vec::new();
+        if self.bom && !self.lines.first().is_some_and(|(c, _)| c.starts_with(BOM)) {
+            out.extend_from_slice(BOM);
+        }
         for (c, t) in &self.lines {
             out.extend_from_slice(c);
             out.extend_from_slice(t);
@@ -437,24 +448,38 @@ fn to_splices(
 fn find_splice(doc: &Doc, find: &[u8], with: &[u8], order: usize) -> Result<Splice, Refusal> {
     let mut joined = Vec::new();
     let mut starts = Vec::with_capacity(doc.lines.len());
+    let mut contents: Vec<&[u8]> = Vec::with_capacity(doc.lines.len());
     for (i, (c, _)) in doc.lines.iter().enumerate() {
         if i > 0 {
             joined.push(b'\n');
         }
+        let c = if i == 0 {
+            c.strip_prefix(BOM).unwrap_or(c)
+        } else {
+            c
+        };
         starts.push(joined.len());
+        contents.push(c);
         joined.extend_from_slice(c);
     }
+    let line_of = |off: usize| starts.partition_point(|&st| st <= off) - 1;
+    let end_of = |l: usize| starts[l] + contents[l].len();
     let hits: Vec<usize> = memchr::memmem::find_iter(&joined, find).collect();
     if hits.len() != 1 {
         let preview = String::from_utf8_lossy(&find[..find.len().min(60)]).into_owned();
+        let want: Vec<&[u8]> = find.split(|&b| b == b'\n').collect();
         return Err(Refusal::FindCount {
             count: hits.len(),
             preview,
+            lines: hits.iter().take(10).map(|&h| line_of(h) + 1).collect(),
+            near: if hits.is_empty() {
+                crate::nearmiss::candidates(&contents, &want, 5)
+            } else {
+                Vec::new()
+            },
         });
     }
     let (s, e) = (hits[0], hits[0] + find.len());
-    let line_of = |off: usize| starts.partition_point(|&st| st <= off) - 1;
-    let end_of = |l: usize| starts[l] + doc.lines[l].0.len();
     let first = line_of(s);
     // the line holding the match's end. if the match swallowed a line break,
     // the next line's content starts right at `e` and must be kept, so it
@@ -532,15 +557,6 @@ pub fn apply(src: &[u8], ops: &[Op], cfg: &Config) -> Result<Applied, Refusal> {
             t.clear();
         }
     }
-    // keep a BOM that was there (a replaced first line usually drops it)
-    if doc.bom
-        && let Some((first, _)) = out.first_mut()
-        && !first.starts_with(BOM)
-    {
-        let mut v = BOM.to_vec();
-        v.extend_from_slice(first);
-        *first = v;
-    }
     let new_doc = Doc {
         lines: out,
         eol: doc.eol.clone(),
@@ -599,15 +615,53 @@ fn refusal_report(ctx: &Ctx, rel: &str, src: &[u8], why: &Refusal) -> Report {
                 .flat_map(|&c| around(&ctx.cfg, src, c, 0))
                 .collect(),
         ),
-        Refusal::FindCount { count: 0, preview } => (
-            format!("find text not found: {preview:?}. it has to match exactly (whitespace too)."),
-            Vec::new(),
-        ),
-        Refusal::FindCount { count, preview } => (
+        Refusal::FindCount {
+            count: 0,
+            preview,
+            near,
+            ..
+        } if near.is_empty() => (
             format!(
-                "find text {preview:?} occurs {count} times; include more surrounding lines so it's unique."
+                "find text not found: {preview:?}, not even loosely (ignoring whitespace and quotes). check it with ax grep."
             ),
             Vec::new(),
+        ),
+        Refusal::FindCount {
+            count: 0,
+            preview,
+            near,
+            ..
+        } => (
+            format!(
+                "find text {preview:?} isn't in the file exactly. closest: {}. the real lines, to anchor with @@ replace or copy exactly:",
+                near[0].why
+            ),
+            near.iter()
+                .flat_map(|c| {
+                    let mut v: Vec<String> = (c.start + 1..=c.start + c.len)
+                        .flat_map(|l| around(&ctx.cfg, src, l, 0))
+                        .collect();
+                    v.push("  …".into());
+                    v
+                })
+                .collect::<Vec<_>>()
+                .split_last()
+                .map(|(_, v)| v.to_vec())
+                .unwrap_or_default(),
+        ),
+        Refusal::FindCount {
+            count,
+            preview,
+            lines,
+            ..
+        } => (
+            format!(
+                "find text {preview:?} occurs {count} times; add surrounding lines to make it unique, or use one of these anchors:"
+            ),
+            lines
+                .iter()
+                .flat_map(|&l| around(&ctx.cfg, src, l, 0))
+                .collect(),
         ),
     };
     r.lines.push(format!("{rel}: {msg}"));
