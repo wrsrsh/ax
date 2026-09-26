@@ -60,7 +60,7 @@ fn ax_pairs(dir: &Path, args: &[&str]) -> BTreeSet<(String, usize)> {
     let mut a = vec!["--json", "grep"];
     a.extend_from_slice(args);
     let o = ax_env(dir, &[("AX_NO_CAPS", "1")], &a);
-    assert!(o.status.success(), "{}", String::from_utf8_lossy(&o.stderr));
+    assert!(o.status.success(), "{}", stderr(&o));
     let v: serde_json::Value = serde_json::from_slice(&o.stdout).unwrap();
     v["data"]
         .as_array()
@@ -131,29 +131,12 @@ fn files_and_counts_match_rg() {
     let t = grep_fixture();
     let mut ours = body(&ax(t.path(), &["grep", "-l", "foo"]));
     ours.sort();
-    let o = std::process::Command::new("rg")
-        .args(["-l", "foo"])
-        .current_dir(t.path())
-        .output()
-        .unwrap();
-    let mut theirs: Vec<String> = String::from_utf8(o.stdout)
-        .unwrap()
-        .lines()
-        .map(str::to_string)
-        .collect();
-    theirs.sort();
-    assert_eq!(ours, theirs);
+    assert_eq!(ours, rg(t.path(), &["-l", "foo"]));
 
     let mut ours = body(&ax(t.path(), &["grep", "-c", "foo"]));
     ours.sort();
-    let o = std::process::Command::new("rg")
-        .args(["-c", "foo"])
-        .current_dir(t.path())
-        .output()
-        .unwrap();
-    let mut theirs: Vec<String> = String::from_utf8(o.stdout)
-        .unwrap()
-        .lines()
+    let mut theirs: Vec<String> = rg(t.path(), &["-c", "foo"])
+        .iter()
         .map(|l| l.replacen(':', ": ", 1))
         .collect();
     theirs.sort();
@@ -239,12 +222,7 @@ fn binary_after_matches_follows_rg_per_mode() {
     assert!(stdout(&ax(t.path(), &["grep", "-l", "needle"])).contains("late-nul.txt"));
     assert!(!stdout(&ax(t.path(), &["grep", "-c", "needle"])).contains("late-nul.txt"));
     if have_rg() {
-        let rg = std::process::Command::new("rg")
-            .args(["-c", "needle", "."])
-            .current_dir(t.path())
-            .stdin(std::process::Stdio::null())
-            .output()
-            .unwrap();
-        assert!(!String::from_utf8_lossy(&rg.stdout).contains("late-nul"));
+        let theirs = rg(t.path(), &["-c", "needle", "."]);
+        assert!(!theirs.iter().any(|l| l.contains("late-nul")));
     }
 }

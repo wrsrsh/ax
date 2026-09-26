@@ -47,6 +47,17 @@ impl Enc {
         }
         Ok(Cow::Owned(out))
     }
+
+    /// `encode`, with the refusal edit and patch show for a character that
+    /// doesn't fit.
+    pub fn encode_owned(self, text: &[u8]) -> Result<Vec<u8>, String> {
+        self.encode(text).map(Cow::into_owned).map_err(|c| {
+            format!(
+                "{c:?} can't go in this file: it's {} and has no byte for that character",
+                self.label()
+            )
+        })
+    }
 }
 
 /// one line for display: UTF-8 as is, anything else as Windows-1252.

@@ -12,33 +12,11 @@ fn find_matches_rg_files() {
     assert!(o.status.success());
     let mut ours = body(&o);
     ours.sort();
-    let rg = std::process::Command::new("rg")
-        .arg("--files")
-        .current_dir(t.path())
-        .output()
-        .unwrap();
-    let mut theirs: Vec<String> = String::from_utf8(rg.stdout)
-        .unwrap()
-        .lines()
-        .map(str::to_string)
-        .collect();
-    theirs.sort();
-    assert_eq!(ours, theirs);
+    assert_eq!(ours, rg(t.path(), &["--files"]));
     for g in ["*.ts", "src/**/*.ts", "!*.md"] {
         let mut ours = body(&ax(t.path(), &["find", g]));
         ours.sort();
-        let rg = std::process::Command::new("rg")
-            .args(["--files", "-g", g])
-            .current_dir(t.path())
-            .output()
-            .unwrap();
-        let mut theirs: Vec<String> = String::from_utf8(rg.stdout)
-            .unwrap()
-            .lines()
-            .map(str::to_string)
-            .collect();
-        theirs.sort();
-        assert_eq!(ours, theirs, "glob {g}");
+        assert_eq!(ours, rg(t.path(), &["--files", "-g", g]), "glob {g}");
     }
 }
 

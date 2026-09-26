@@ -80,13 +80,10 @@ fn fits(window: &[&[u8]], want: &[&[u8]], norm: Norm) -> bool {
 /// near matches of `want` (lines, no terminators) in `lines`, loosest level
 /// last. only the first level that matches anything is reported.
 pub fn candidates(lines: &[&[u8]], want: &[&[u8]], max: usize) -> Vec<Candidate> {
-    let want: Vec<&[u8]> = {
-        let mut w = want.to_vec();
-        while w.len() > 1 && w.last().is_some_and(|l| l.is_empty()) {
-            w.pop();
-        }
-        w
-    };
+    let mut want = want.to_vec();
+    while want.len() > 1 && want.last().is_some_and(|l| l.is_empty()) {
+        want.pop();
+    }
     let k = want.len();
     if k == 0 || k > lines.len() || want.iter().all(|l| trim_end(l).is_empty()) {
         return Vec::new();

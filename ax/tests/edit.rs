@@ -1,26 +1,10 @@
 mod common;
-use assert_cmd::Command;
 use common::*;
 use std::path::Path;
+use std::process::Output;
 
-fn edit(dir: &Path, path: &str, ops: &str) -> std::process::Output {
-    Command::cargo_bin("ax")
-        .unwrap()
-        .current_dir(dir)
-        .args(["edit", path])
-        .write_stdin(ops)
-        .output()
-        .unwrap()
-}
-
-/// anchor for line n, taken from `ax read --json` like an agent would
-fn anchor(dir: &Path, path: &str, n: usize) -> String {
-    let o = ax(dir, &["--json", "read", &format!("{path}:{n}-{n}")]);
-    let v: serde_json::Value = serde_json::from_slice(&o.stdout).unwrap();
-    v["data"]["files"][0]["rows"][0]["anchor"]
-        .as_str()
-        .unwrap()
-        .to_string()
+fn edit(dir: &Path, path: &str, ops: &str) -> Output {
+    ax_in(dir, &["edit", path], ops)
 }
 
 const SRC: &str =
@@ -118,17 +102,12 @@ fn moved_line_is_relocated() {
     );
     assert!(o.status.success(), "{}", stdout(&o));
     assert!(stdout(&o).contains("1 relocated"));
-    let v: serde_json::Value = serde_json::from_slice(
-        &Command::cargo_bin("ax")
-            .unwrap()
-            .current_dir(t.path())
-            .args(["--json", "edit", "src/math.ts"])
-            .write_stdin("@@ find\nexport const x = 2\n@@ with\nexport const x = 3\n".to_string())
-            .output()
-            .unwrap()
-            .stdout,
-    )
-    .unwrap();
+    let o = ax_in(
+        t.path(),
+        &["--json", "edit", "src/math.ts"],
+        "@@ find\nexport const x = 2\n@@ with\nexport const x = 3\n",
+    );
+    let v: serde_json::Value = serde_json::from_slice(&o.stdout).unwrap();
     assert_eq!(v["data"]["outcome"], "ok");
     assert!(
         std::fs::read_to_string(t.path().join("src/math.ts"))
@@ -161,7 +140,7 @@ fn refuses_outside_repo_missing_and_binary() {
     let rel = format!("{}/f.ts", outside.path().display());
     let o = edit(t.path(), &rel, "@@ find\nx\n@@ with\ny\n");
     assert_eq!(o.status.code(), Some(1));
-    assert!(String::from_utf8_lossy(&o.stderr).contains("outside the repo"));
+    assert!(stderr(&o).contains("outside the repo"));
     assert_eq!(
         std::fs::read_to_string(outside.path().join("f.ts")).unwrap(),
         "x\n"
@@ -179,7 +158,7 @@ fn refuses_outside_repo_missing_and_binary() {
     }
 
     let o = edit(t.path(), "nope.ts", "@@ find\nx\n@@ with\ny\n");
-    assert!(String::from_utf8_lossy(&o.stderr).contains("ax write"));
+    assert!(stderr(&o).contains("ax write"));
 
     std::fs::write(t.path().join("b.bin"), b"a\0b").unwrap();
     let o = edit(t.path(), "b.bin", "@@ find\na\n@@ with\nb\n");
@@ -193,7 +172,7 @@ fn symlink_inside_repo_is_written_through() {
     write(t.path(), "src/real.ts", "a\n");
     std::os::unix::fs::symlink("real.ts", t.path().join("src/alias.ts")).unwrap();
     let o = edit(t.path(), "src/alias.ts", "@@ find\na\n@@ with\nb\n");
-    assert!(o.status.success(), "{}", String::from_utf8_lossy(&o.stderr));
+    assert!(o.status.success(), "{}", stderr(&o));
     assert!(t.path().join("src/alias.ts").is_symlink());
     assert_eq!(
         std::fs::read_to_string(t.path().join("src/real.ts")).unwrap(),

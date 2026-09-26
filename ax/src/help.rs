@@ -42,14 +42,14 @@ AX_LOG=<file>        append one json line per call
 ";
 
 pub fn run(env: bool) -> Report {
-    let mut r = Report::new("agent-help");
-    let text = if env { ENV } else { NOTE };
-    r.lines = text.lines().map(str::to_string).collect();
-    r.summary = Summary::plain(if env {
-        "knobs are read per call; unset means default."
+    let (text, summary) = if env {
+        (ENV, "knobs are read per call; unset means default.")
     } else {
-        "paste this into AGENTS.md or CLAUDE.md."
-    });
+        (NOTE, "paste this into AGENTS.md or CLAUDE.md.")
+    };
+    let mut r = Report::new("agent-help");
+    r.lines = text.lines().map(str::to_string).collect();
+    r.summary = Summary::plain(summary);
     r.data = json!({ "text": text });
     r
 }

@@ -286,23 +286,14 @@ fn parse_unified(lines: &[&str]) -> Result<Vec<FilePatch>> {
     Ok(out)
 }
 
-fn content(doc: &Doc, i: usize) -> &[u8] {
-    let c = &doc.lines[i].0;
-    if i == 0 {
-        c.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(c)
-    } else {
-        c
-    }
-}
-
 /// where `hunk.old` sits in `doc`, searching from `from`. a BOM is invisible.
 fn locate(doc: &Doc, hunk: &Hunk, from: usize) -> Option<usize> {
     let n = doc.lines.len();
     let k = hunk.old.len();
-    let at = |i: usize| i + k <= n && (0..k).all(|j| content(doc, i + j) == hunk.old[j].as_slice());
+    let at = |i: usize| i + k <= n && (0..k).all(|j| doc.content(i + j) == hunk.old[j].as_slice());
     let mut start = from;
     if let Some(s) = &hunk.seek {
-        let found = (from..n).find(|&i| memchr::memmem::find(content(doc, i), s).is_some())?;
+        let found = (from..n).find(|&i| memchr::memmem::find(doc.content(i), s).is_some())?;
         start = found + 1;
         if k == 0 {
             return Some(start);
@@ -334,12 +325,8 @@ struct Patched {
 fn apply_hunks(ctx: &Ctx, rel: &str, src: &[u8], hunks: &[Hunk]) -> Result<Patched> {
     let enc = crate::enc::Enc::detect(src);
     let conv = |b: &[u8]| {
-        enc.encode(b).map(|c| c.into_owned()).map_err(|c| {
-            AxError(format!(
-                "{rel}: {c:?} can't go in this file: it's {} and has no byte for that character",
-                enc.label()
-            ))
-        })
+        enc.encode_owned(b)
+            .map_err(|m| AxError(format!("{rel}: {m}")))
     };
     let hunks: Vec<Hunk> = hunks
         .iter()
@@ -352,9 +339,7 @@ fn apply_hunks(ctx: &Ctx, rel: &str, src: &[u8], hunks: &[Hunk]) -> Result<Patch
             })
         })
         .collect::<Result<_>>()?;
-    let hunks = hunks.as_slice();
     let doc = Doc::parse(src);
-    let had_nl = doc.ends_with_newline();
     let mut out: Vec<(Vec<u8>, Vec<u8>)> = Vec::new();
     let mut regions = Vec::new();
     let (mut added, mut removed) = (0, 0);
@@ -371,7 +356,7 @@ fn apply_hunks(ctx: &Ctx, rel: &str, src: &[u8], hunks: &[Hunk]) -> Result<Patch
             for o in h.old.iter().take(8) {
                 msg.push_str(&format!("  {}\n", crate::enc::show(o)));
             }
-            let contents: Vec<&[u8]> = (0..doc.lines.len()).map(|i| content(&doc, i)).collect();
+            let contents: Vec<&[u8]> = (0..doc.lines.len()).map(|i| doc.content(i)).collect();
             let want: Vec<&[u8]> = h.old.iter().map(Vec::as_slice).collect();
             let close = crate::nearmiss::candidates(&contents, &want, 3);
             if let Some(c) = close.first() {
@@ -390,15 +375,7 @@ fn apply_hunks(ctx: &Ctx, rel: &str, src: &[u8], hunks: &[Hunk]) -> Result<Patch
         };
         out.extend(doc.lines[cursor..at].iter().cloned());
         regions.push((out.len(), h.new.len()));
-        for (i, c) in h.new.iter().enumerate() {
-            let term = doc
-                .lines
-                .get(at + i)
-                .filter(|_| i < h.old.len())
-                .map(|(_, t)| t.clone())
-                .unwrap_or_else(|| doc.eol.clone());
-            out.push((c.clone(), term));
-        }
+        doc.push_replacement(&mut out, at, at + h.old.len(), &h.new);
         added += h.new.len() - h.context;
         removed += h.old.len() - h.context;
         cursor = at + h.old.len();
@@ -407,28 +384,9 @@ fn apply_hunks(ctx: &Ctx, rel: &str, src: &[u8], hunks: &[Hunk]) -> Result<Patch
         }
     }
     out.extend(doc.lines[cursor..].iter().cloned());
-    let keep_nl = match ends_no_eol {
-        Some(no) => !no,
-        None => had_nl,
-    };
-    let n = out.len();
-    for (i, (_, t)) in out.iter_mut().enumerate() {
-        if i + 1 < n || keep_nl {
-            if t.is_empty() {
-                *t = doc.eol.clone();
-            }
-        } else {
-            t.clear();
-        }
-    }
-    let bytes = Doc {
-        lines: out,
-        eol: doc.eol.clone(),
-        bom: doc.bom,
-    }
-    .render();
+    let final_newline = ends_no_eol.map_or(doc.ends_with_newline(), |no| !no);
     Ok(Patched {
-        bytes,
+        bytes: doc.rebuild(out, final_newline),
         added,
         removed,
         regions,

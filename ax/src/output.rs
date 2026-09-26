@@ -9,16 +9,17 @@ use crate::hash::{line_hash, strip_eol};
 use serde::Serialize;
 use serde_json::Value;
 
-/// `14:a3f1  code`. invalid utf-8 is shown lossily; the hash is still over the
-/// raw bytes.
 /// longest line shown as is; minified files get cut here (the anchor still
 /// covers the whole line).
 pub const MAX_LINE: usize = 1000;
 
+/// `14:a3f1  code`. non-utf-8 is shown as windows-1252; the hash is still over
+/// the raw bytes.
 pub fn anchored(cfg: &Config, n: usize, line: &[u8]) -> String {
     let raw = strip_eol(line);
     let text = if cfg.caps && raw.len() > MAX_LINE {
         let mut cut = MAX_LINE;
+        // back up to a utf-8 char boundary
         while cut > 0 && (raw[cut] & 0xC0) == 0x80 {
             cut -= 1;
         }

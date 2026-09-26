@@ -1,6 +1,7 @@
 use ax::output::Report;
 use ax::{AxError, Ctx};
 use clap::{Parser, Subcommand};
+use std::io::{Read, Write};
 
 /// one cli for the file work coding agents do all day: orient, find, search, read, edit.
 #[derive(Parser)]
@@ -144,7 +145,6 @@ enum Cmd {
 }
 
 fn stdin() -> ax::Result<Vec<u8>> {
-    use std::io::Read;
     let mut input = Vec::new();
     std::io::stdin().read_to_end(&mut input)?;
     Ok(input)
@@ -159,16 +159,16 @@ fn run(ctx: &Ctx, cmd: Cmd) -> ax::Result<Report> {
             within,
             changed,
             all,
-        } => {
-            let args = ax::find::FindArgs {
+        } => ax::find::run(
+            ctx,
+            &ax::find::FindArgs {
                 pattern,
                 ext,
                 within,
                 changed,
                 all,
-            };
-            ax::find::run(ctx, &args)
-        }
+            },
+        ),
         Cmd::Grep {
             pattern,
             paths,
@@ -183,8 +183,9 @@ fn run(ctx: &Ctx, cmd: Cmd) -> ax::Result<Report> {
             files_with_matches,
             count,
             all,
-        } => {
-            let args = ax::grep::GrepArgs {
+        } => ax::grep::run(
+            ctx,
+            &ax::grep::GrepArgs {
                 pattern,
                 fixed: fixed_strings,
                 word: word_regexp,
@@ -197,9 +198,8 @@ fn run(ctx: &Ctx, cmd: Cmd) -> ax::Result<Report> {
                 files_only: files_with_matches,
                 count,
                 all,
-            };
-            ax::grep::run(ctx, &args)
-        }
+            },
+        ),
         Cmd::Outline { path } => ax::symbols::outline(ctx, &path),
         Cmd::Def { sym, within } => ax::symbols::def(ctx, &sym, &within),
         Cmd::Refs {
@@ -250,7 +250,6 @@ fn log_call(started: std::time::Instant, exit: i32, out_bytes: usize, data: &ser
         "outcome": data.get("outcome").cloned().unwrap_or(serde_json::Value::Null),
         "knobs": knobs,
     });
-    use std::io::Write;
     if let Ok(mut f) = std::fs::OpenOptions::new()
         .create(true)
         .append(true)
@@ -266,7 +265,6 @@ fn main() {
     let result = Ctx::from_env()
         .map_err(AxError::from)
         .and_then(|ctx| run(&ctx, cli.cmd));
-    use std::io::Write;
     let (out, exit, data, to_stderr) = match result {
         Ok(report) => {
             let out = if cli.json {

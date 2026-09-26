@@ -1,18 +1,7 @@
 mod common;
-use assert_cmd::Command;
 use common::*;
 use std::fs;
 use std::path::Path;
-
-fn with_stdin(dir: &Path, args: &[&str], input: &str) -> std::process::Output {
-    Command::cargo_bin("ax")
-        .unwrap()
-        .current_dir(dir)
-        .args(args)
-        .write_stdin(input)
-        .output()
-        .unwrap()
-}
 
 fn file_hash(dir: &Path, path: &str) -> String {
     let o = ax(dir, &["--json", "read", path]);
@@ -23,7 +12,7 @@ fn file_hash(dir: &Path, path: &str) -> String {
 #[test]
 fn write_creates_replaces_and_checks_hash() {
     let t = fixture();
-    let o = with_stdin(t.path(), &["write", "src/new/deep.ts"], "a\nb\n");
+    let o = ax_in(t.path(), &["write", "src/new/deep.ts"], "a\nb\n");
     assert!(o.status.success());
     assert!(summary(&o).starts_with("wrote src/new/deep.ts: created, hash "));
     assert_eq!(
@@ -32,7 +21,7 @@ fn write_creates_replaces_and_checks_hash() {
     );
 
     let h = file_hash(t.path(), "src/new/deep.ts");
-    let o = with_stdin(t.path(), &["write", "src/new/deep.ts", "--if", &h], "c\n");
+    let o = ax_in(t.path(), &["write", "src/new/deep.ts", "--if", &h], "c\n");
     assert!(o.status.success(), "{}", stdout(&o));
     assert!(
         summary(&o).contains("replaced (2 lines → 1 line)"),
@@ -41,7 +30,7 @@ fn write_creates_replaces_and_checks_hash() {
     );
 
     // old hash is stale now
-    let o = with_stdin(t.path(), &["write", "src/new/deep.ts", "--if", &h], "d\n");
+    let o = ax_in(t.path(), &["write", "src/new/deep.ts", "--if", &h], "d\n");
     assert_eq!(o.status.code(), Some(1));
     assert!(stdout(&o).contains("changed since you read it"));
     assert_eq!(
@@ -49,7 +38,7 @@ fn write_creates_replaces_and_checks_hash() {
         "c\n"
     );
 
-    let o = with_stdin(t.path(), &["write", "../escape.ts"], "x\n");
+    let o = ax_in(t.path(), &["write", "../escape.ts"], "x\n");
     assert_eq!(o.status.code(), Some(1));
     assert!(!t.path().parent().unwrap().join("escape.ts").exists());
 }
@@ -77,13 +66,8 @@ fn codex_patch_multi_file() {
 +fn main() { println!(\"hi\") }
 *** End Patch
 ";
-    let o = with_stdin(t.path(), &["patch"], p);
-    assert!(
-        o.status.success(),
-        "{}\n{}",
-        stdout(&o),
-        String::from_utf8_lossy(&o.stderr)
-    );
+    let o = ax_in(t.path(), &["patch"], p);
+    assert!(o.status.success(), "{}\n{}", stdout(&o), stderr(&o));
     let out = stdout(&o);
     assert!(out.contains("M src/a.ts  +1 -1"), "{out}");
     assert!(out.contains("A src/b.ts  +1"), "{out}");
@@ -107,8 +91,8 @@ fn unified_patch_with_offset() {
     write(t.path(), "src/a.ts", "x\n// added later\none\ntwo\nthree\n");
     // hunk says line 2 but the text is now at line 3
     let p = "--- a/src/a.ts\n+++ b/src/a.ts\n@@ -2,3 +2,3 @@\n one\n-two\n+TWO\n three\n";
-    let o = with_stdin(t.path(), &["patch"], p);
-    assert!(o.status.success(), "{}", String::from_utf8_lossy(&o.stderr));
+    let o = ax_in(t.path(), &["patch"], p);
+    assert!(o.status.success(), "{}", stderr(&o));
     assert_eq!(
         fs::read_to_string(t.path().join("src/a.ts")).unwrap(),
         "x\n// added later\none\nTWO\nthree\n"
@@ -130,9 +114,9 @@ fn failing_hunk_writes_nothing_anywhere() {
 +nope
 *** End Patch
 ";
-    let o = with_stdin(t.path(), &["patch"], p);
+    let o = ax_in(t.path(), &["patch"], p);
     assert_eq!(o.status.code(), Some(1));
-    let err = String::from_utf8_lossy(&o.stderr);
+    let err = stderr(&o);
     assert!(
         err.contains("src/main.rs: hunk 1 of 1 doesn't match"),
         "{err}"
@@ -149,14 +133,14 @@ fn failing_hunk_writes_nothing_anywhere() {
 fn patch_refuses_bad_input_and_escapes() {
     let t = fixture();
     assert_eq!(
-        with_stdin(t.path(), &["patch"], "hello\n").status.code(),
+        ax_in(t.path(), &["patch"], "hello\n").status.code(),
         Some(1)
     );
     let p = "*** Begin Patch\n*** Add File: ../x.ts\n+x\n*** End Patch\n";
-    assert_eq!(with_stdin(t.path(), &["patch"], p).status.code(), Some(1));
+    assert_eq!(ax_in(t.path(), &["patch"], p).status.code(), Some(1));
     let p = "*** Begin Patch\n*** Add File: src/router.ts\n+x\n*** End Patch\n";
-    let o = with_stdin(t.path(), &["patch"], p);
-    assert!(String::from_utf8_lossy(&o.stderr).contains("already exists"));
+    let o = ax_in(t.path(), &["patch"], p);
+    assert!(stderr(&o).contains("already exists"));
 }
 
 #[test]
@@ -164,9 +148,9 @@ fn no_final_newline_is_respected() {
     let t = fixture();
     fs::write(t.path().join("n.txt"), "a\nb").unwrap();
     let p = "--- a/n.txt\n+++ b/n.txt\n@@ -1,2 +1,2 @@\n a\n-b\n\\ No newline at end of file\n+B\n\\ No newline at end of file\n";
-    assert!(with_stdin(t.path(), &["patch"], p).status.success());
+    assert!(ax_in(t.path(), &["patch"], p).status.success());
     assert_eq!(fs::read(t.path().join("n.txt")).unwrap(), b"a\nB");
     let p = "--- a/n.txt\n+++ b/n.txt\n@@ -1,2 +1,2 @@\n a\n-B\n\\ No newline at end of file\n+B\n";
-    assert!(with_stdin(t.path(), &["patch"], p).status.success());
+    assert!(ax_in(t.path(), &["patch"], p).status.success());
     assert_eq!(fs::read(t.path().join("n.txt")).unwrap(), b"a\nB\n");
 }

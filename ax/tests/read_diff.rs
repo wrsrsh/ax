@@ -34,10 +34,7 @@ fn read_long_file_gets_outline_and_window() {
         &["read", "src/big.ts"],
     );
     let out = stdout(&o);
-    assert!(
-        out.contains("outline (61 symbols):") || out.contains("outline ("),
-        "{out}"
-    );
+    assert!(out.contains("outline ("), "{out}");
     assert!(out.contains("  1-402  class Big"), "{out}");
     assert!(out.contains("\n50:"), "{out}");
     assert!(!out.contains("\n51:"), "{out}");

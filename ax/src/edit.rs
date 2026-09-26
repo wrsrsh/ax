@@ -22,7 +22,9 @@
 
 use crate::config::Config;
 use crate::hash::line_hash;
-use crate::output::anchored;
+use crate::output::{Report, Summary, anchored};
+use crate::{Ctx, fsio, hash, repo, text};
+use serde_json::json;
 
 /// how far (in lines) a moved anchor is searched for.
 pub const RELOCATE_WINDOW: usize = 20;
@@ -60,10 +62,12 @@ pub enum Op {
 /// why an edit call wrote nothing.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Refusal {
-    /// bad op syntax
     Syntax(String),
     /// the anchored line's content changed; `line` is where it pointed
-    Stale { anchor: String, line: usize },
+    Stale {
+        anchor: String,
+        line: usize,
+    },
     /// the anchored line moved and more than one candidate is nearby
     Ambiguous {
         anchor: String,
@@ -87,11 +91,10 @@ pub enum Refusal {
 impl Refusal {
     pub fn outcome(&self) -> &'static str {
         match self {
-            Refusal::Syntax(_) => "error",
+            Refusal::Syntax(_) | Refusal::Overlap(_) => "error",
             Refusal::Stale { .. } => "stale",
             Refusal::Ambiguous { .. } => "ambiguous",
             Refusal::FindCount { .. } => "no-match",
-            Refusal::Overlap(_) => "error",
             Refusal::Parse(_) => "parse-rejected",
         }
     }
@@ -287,6 +290,56 @@ impl Doc {
         self.lines.last().is_none_or(|(_, t)| !t.is_empty())
     }
 
+    /// line `i` without its terminator. a BOM is invisible.
+    pub fn content(&self, i: usize) -> &[u8] {
+        let c = &self.lines[i].0;
+        if i == 0 {
+            c.strip_prefix(BOM).unwrap_or(c)
+        } else {
+            c
+        }
+    }
+
+    /// push `new` in place of lines [start, end): each new line keeps the
+    /// terminator of the old line in its slot, extra ones get the file's eol.
+    pub fn push_replacement(
+        &self,
+        out: &mut Vec<(Vec<u8>, Vec<u8>)>,
+        start: usize,
+        end: usize,
+        new: &[Vec<u8>],
+    ) {
+        for (i, c) in new.iter().enumerate() {
+            let term = if start + i < end {
+                self.lines[start + i].1.clone()
+            } else {
+                self.eol.clone()
+            };
+            out.push((c.clone(), term));
+        }
+    }
+
+    /// `lines` rendered as this file: every line but the last gets a
+    /// terminator, the last one only if `final_newline`.
+    pub fn rebuild(&self, mut lines: Vec<(Vec<u8>, Vec<u8>)>, final_newline: bool) -> Vec<u8> {
+        let n = lines.len();
+        for (i, (_, t)) in lines.iter_mut().enumerate() {
+            if i + 1 < n || final_newline {
+                if t.is_empty() {
+                    *t = self.eol.clone();
+                }
+            } else {
+                t.clear();
+            }
+        }
+        Doc {
+            lines,
+            eol: self.eol.clone(),
+            bom: self.bom,
+        }
+        .render()
+    }
+
     /// a BOM the file had is put back even if an edit replaced line 1.
     pub fn render(&self) -> Vec<u8> {
         let mut out = Vec::new();
@@ -352,6 +405,29 @@ fn resolve(doc: &Doc, a: &Anchor, cfg: &Config, relocated: &mut usize) -> Result
     })
 }
 
+/// lines [start, end) of a range op, as 0-based half-open indices.
+fn resolve_range(
+    doc: &Doc,
+    from: &Anchor,
+    to: &Anchor,
+    cfg: &Config,
+    relocated: &mut usize,
+) -> Result<(usize, usize), Refusal> {
+    let a = resolve(doc, from, cfg, relocated)?;
+    let b = if to == from {
+        a
+    } else {
+        resolve(doc, to, cfg, relocated)?
+    };
+    if b < a {
+        return Err(Refusal::Syntax(format!(
+            "range {}..{} runs backwards",
+            from.line, to.line
+        )));
+    }
+    Ok((a, b + 1))
+}
+
 /// replace lines [start, end) with `new` (contents; terminators decided later).
 #[derive(Debug, Clone)]
 struct Splice {
@@ -371,41 +447,19 @@ fn to_splices(
     for (order, op) in ops.iter().enumerate() {
         let s = match op {
             Op::Replace { from, to, body } => {
-                let a = resolve(doc, from, cfg, relocated)?;
-                let b = if to == from {
-                    a
-                } else {
-                    resolve(doc, to, cfg, relocated)?
-                };
-                if b < a {
-                    return Err(Refusal::Syntax(format!(
-                        "range {}..{} runs backwards",
-                        from.line, to.line
-                    )));
-                }
+                let (start, end) = resolve_range(doc, from, to, cfg, relocated)?;
                 Splice {
-                    start: a,
-                    end: b + 1,
+                    start,
+                    end,
                     new: body.clone(),
                     order,
                 }
             }
             Op::Delete { from, to } => {
-                let a = resolve(doc, from, cfg, relocated)?;
-                let b = if to == from {
-                    a
-                } else {
-                    resolve(doc, to, cfg, relocated)?
-                };
-                if b < a {
-                    return Err(Refusal::Syntax(format!(
-                        "range {}..{} runs backwards",
-                        from.line, to.line
-                    )));
-                }
+                let (start, end) = resolve_range(doc, from, to, cfg, relocated)?;
                 Splice {
-                    start: a,
-                    end: b + 1,
+                    start,
+                    end,
                     new: Vec::new(),
                     order,
                 }
@@ -446,20 +500,14 @@ fn to_splices(
 /// exact-text find over the file's lines joined with `\n` (so CRLF files work
 /// with plain `\n` find text). turns the match into a splice of whole lines.
 fn find_splice(doc: &Doc, find: &[u8], with: &[u8], order: usize) -> Result<Splice, Refusal> {
+    let contents: Vec<&[u8]> = (0..doc.lines.len()).map(|i| doc.content(i)).collect();
     let mut joined = Vec::new();
-    let mut starts = Vec::with_capacity(doc.lines.len());
-    let mut contents: Vec<&[u8]> = Vec::with_capacity(doc.lines.len());
-    for (i, (c, _)) in doc.lines.iter().enumerate() {
+    let mut starts = Vec::with_capacity(contents.len());
+    for (i, c) in contents.iter().enumerate() {
         if i > 0 {
             joined.push(b'\n');
         }
-        let c = if i == 0 {
-            c.strip_prefix(BOM).unwrap_or(c)
-        } else {
-            c
-        };
         starts.push(joined.len());
-        contents.push(c);
         joined.extend_from_slice(c);
     }
     let line_of = |off: usize| starts.partition_point(|&st| st <= off) - 1;
@@ -507,7 +555,6 @@ pub fn apply(src: &[u8], ops: &[Op], cfg: &Config) -> Result<Applied, Refusal> {
     let doc = Doc::parse(src);
     let mut relocated = 0;
     let splices = to_splices(&doc, ops, cfg, &mut relocated)?;
-    let had_final_newline = doc.ends_with_newline();
 
     let mut out: Vec<(Vec<u8>, Vec<u8>)> = Vec::with_capacity(doc.lines.len());
     let mut regions = Vec::new();
@@ -531,39 +578,12 @@ pub fn apply(src: &[u8], ops: &[Op], cfg: &Config) -> Result<Applied, Refusal> {
         removed += old.len() - pre - post;
         added += s.new.len() - pre - post;
         regions.push((out.len(), s.new.len()));
-        for (i, c) in s.new.iter().enumerate() {
-            // reuse the original terminator of the line in the same slot, if any
-            let term = doc
-                .lines
-                .get(s.start + i)
-                .filter(|_| s.start + i < s.end)
-                .map(|(_, t)| t.clone())
-                .unwrap_or_else(|| doc.eol.clone());
-            out.push((c.clone(), term));
-        }
+        doc.push_replacement(&mut out, s.start, s.end, &s.new);
         cursor = s.end;
     }
     out.extend(doc.lines[cursor..].iter().cloned());
-
-    // every line but the last needs a terminator; the last keeps the file's
-    // original "ends with newline or not" state
-    let n = out.len();
-    for (i, (_, t)) in out.iter_mut().enumerate() {
-        if i + 1 < n || had_final_newline {
-            if t.is_empty() {
-                *t = doc.eol.clone();
-            }
-        } else {
-            t.clear();
-        }
-    }
-    let new_doc = Doc {
-        lines: out,
-        eol: doc.eol.clone(),
-        bom: doc.bom,
-    };
     Ok(Applied {
-        bytes: new_doc.render(),
+        bytes: doc.rebuild(out, doc.ends_with_newline()),
         added,
         removed,
         relocated,
@@ -587,16 +607,10 @@ pub fn around(cfg: &Config, src: &[u8], line: usize, radius: usize) -> Vec<Strin
 
 // ---- the command -------------------------------------------------------------
 
-use crate::output::{Report, Summary};
-use crate::{Ctx, fsio, hash, repo, text};
-use serde_json::json;
-
 fn refusal_report(ctx: &Ctx, rel: &str, src: &[u8], why: &Refusal) -> Report {
     let mut r = Report::new("edit");
     let (msg, show): (String, Vec<String>) = match why {
-        Refusal::Syntax(m) => (m.clone(), Vec::new()),
-        Refusal::Overlap(m) => (m.clone(), Vec::new()),
-        Refusal::Parse(m) => (m.clone(), Vec::new()),
+        Refusal::Syntax(m) | Refusal::Overlap(m) | Refusal::Parse(m) => (m.clone(), Vec::new()),
         Refusal::Stale { anchor, line } => (
             format!("stale anchor {anchor}: that line changed since you read it. current lines:"),
             around(&ctx.cfg, src, *line, 3),
@@ -637,17 +651,13 @@ fn refusal_report(ctx: &Ctx, rel: &str, src: &[u8], why: &Refusal) -> Report {
                 near[0].why
             ),
             near.iter()
-                .flat_map(|c| {
-                    let mut v: Vec<String> = (c.start + 1..=c.start + c.len)
+                .map(|c| {
+                    (c.start + 1..=c.start + c.len)
                         .flat_map(|l| around(&ctx.cfg, src, l, 0))
-                        .collect();
-                    v.push("  …".into());
-                    v
+                        .collect::<Vec<_>>()
                 })
                 .collect::<Vec<_>>()
-                .split_last()
-                .map(|(_, v)| v.to_vec())
-                .unwrap_or_default(),
+                .join(&"  …".to_string()),
         ),
         Refusal::FindCount {
             count,
@@ -688,14 +698,7 @@ fn windows(regions: &[(usize, usize)], n: usize, ctx_lines: usize) -> Vec<(usize
 
 /// the agent writes UTF-8; a Windows-1252 file needs its text in 1252.
 fn transcode(ops: Vec<Op>, enc: crate::enc::Enc) -> Result<Vec<Op>, Refusal> {
-    let e = |b: &[u8]| {
-        enc.encode(b).map(|c| c.into_owned()).map_err(|c| {
-            Refusal::Syntax(format!(
-                "{c:?} can't go in this file: it's {} and has no byte for that character",
-                enc.label()
-            ))
-        })
-    };
+    let e = |b: &[u8]| enc.encode_owned(b).map_err(Refusal::Syntax);
     let lines = |v: Vec<Vec<u8>>| v.iter().map(|b| e(b)).collect::<Result<Vec<_>, _>>();
     ops.into_iter()
         .map(|op| {
@@ -734,50 +737,38 @@ pub fn run(ctx: &Ctx, path: &str, input: &[u8], dry_run: bool) -> crate::Result<
             "{rel} looks binary; not editing it"
         )));
     }
-    let ops = match parse_ops(input, &ctx.cfg) {
-        Ok(o) => o,
-        Err(e) => return Ok(refusal_report(ctx, &rel, &src, &e)),
+    // (applied, op count, new lines ending in whitespace)
+    let attempt = || -> Result<(Applied, usize, usize), Refusal> {
+        let ops = parse_ops(input, &ctx.cfg)?;
+        let new_text: Vec<&[u8]> = ops
+            .iter()
+            .flat_map(|op| -> Vec<&[u8]> {
+                match op {
+                    Op::Replace { body, .. } | Op::Insert { body, .. } => {
+                        body.iter().map(Vec::as_slice).collect()
+                    }
+                    Op::FindWith { with, .. } => with.split(|&b| b == b'\n').collect(),
+                    Op::Delete { .. } => Vec::new(),
+                }
+            })
+            .collect();
+        if text::looks_anchored(&new_text) {
+            return Err(Refusal::Syntax(
+                "the new lines start with LINE:HASH anchors copied from ax output; send just the code, without the `12:a3f1  ` prefix".into(),
+            ));
+        }
+        let ws = text::trailing_ws(&new_text);
+        let ops = transcode(ops, crate::enc::Enc::detect(&src))?;
+        let applied = apply(&src, &ops, &ctx.cfg)?;
+        if ctx.cfg.parse_check {
+            crate::syntax::guard(&rel, Some(&src), &applied.bytes).map_err(Refusal::Parse)?;
+        }
+        Ok((applied, ops.len(), ws))
     };
-    let bodies: Vec<&Vec<u8>> = ops
-        .iter()
-        .flat_map(|op| match op {
-            Op::Replace { body, .. } | Op::Insert { body, .. } => body.iter().collect(),
-            _ => Vec::new(),
-        })
-        .collect();
-    let with_lines: Vec<&[u8]> = ops
-        .iter()
-        .flat_map(|op| match op {
-            Op::FindWith { with, .. } => with.split(|&b| b == b'\n').collect(),
-            _ => Vec::new(),
-        })
-        .collect();
-    let new_text: Vec<&[u8]> = bodies
-        .iter()
-        .map(|b| b.as_slice())
-        .chain(with_lines)
-        .collect();
-    if text::looks_anchored(&new_text) {
-        let e = Refusal::Syntax(
-            "the new lines start with LINE:HASH anchors copied from ax output; send just the code, without the `12:a3f1  ` prefix".into(),
-        );
-        return Ok(refusal_report(ctx, &rel, &src, &e));
-    }
-    let ws = text::trailing_ws(&new_text);
-    let enc = crate::enc::Enc::detect(&src);
-    let ops = match transcode(ops, enc) {
-        Ok(o) => o,
-        Err(e) => return Ok(refusal_report(ctx, &rel, &src, &e)),
-    };
-    let applied = match apply(&src, &ops, &ctx.cfg) {
+    let (applied, n_ops, ws) = match attempt() {
         Ok(a) => a,
         Err(e) => return Ok(refusal_report(ctx, &rel, &src, &e)),
     };
-    if ctx.cfg.parse_check
-        && let Err(m) = crate::syntax::guard(&rel, Some(&src), &applied.bytes)
-    {
-        return Ok(refusal_report(ctx, &rel, &src, &Refusal::Parse(m)));
-    }
     if applied.bytes != src && !dry_run {
         fsio::atomic_write(&abs, &applied.bytes)?;
     }
@@ -788,7 +779,7 @@ pub fn run(ctx: &Ctx, path: &str, input: &[u8], dry_run: bool) -> crate::Result<
         "{rel}: +{} -{}  ({}{})",
         applied.added,
         applied.removed,
-        text::plural(ops.len(), "op"),
+        text::plural(n_ops, "op"),
         if applied.relocated > 0 {
             format!(", {} relocated", applied.relocated)
         } else {
@@ -803,28 +794,21 @@ pub fn run(ctx: &Ctx, path: &str, input: &[u8], dry_run: bool) -> crate::Result<
             r.lines.push("  …".into());
         }
         for (n, l) in new_lines.iter().enumerate().take(hi).skip(lo) {
-            r.lines
-                .push(format!("  {}", crate::output::anchored(&ctx.cfg, n + 1, l)));
+            r.lines.push(format!("  {}", anchored(&ctx.cfg, n + 1, l)));
         }
     }
-    let outcome = if applied.relocated > 0 {
-        "relocated"
-    } else {
-        "ok"
-    };
+    let new_hash = hash::file_hash(&applied.bytes);
     let mut summary = if applied.bytes == src {
         "no change (the ops produced the same bytes).".to_string()
     } else if dry_run {
         format!(
-            "dry run: nothing written. {rel} would be {} (hash {}).",
+            "dry run: nothing written. {rel} would be {} (hash {new_hash}).",
             text::lines_label(new_lines.len()),
-            hash::file_hash(&applied.bytes)
         )
     } else {
         format!(
-            "wrote {rel} ({}, hash {}). anchors above are fresh.",
+            "wrote {rel} ({}, hash {new_hash}). anchors above are fresh.",
             text::lines_label(new_lines.len()),
-            hash::file_hash(&applied.bytes)
         )
     };
     if ws > 0 {
@@ -833,11 +817,11 @@ pub fn run(ctx: &Ctx, path: &str, input: &[u8], dry_run: bool) -> crate::Result<
     r.summary = Summary::plain(summary);
     r.data = json!({
         "path": rel,
-        "outcome": outcome,
+        "outcome": if applied.relocated > 0 { "relocated" } else { "ok" },
         "added": applied.added,
         "removed": applied.removed,
         "relocated": applied.relocated,
-        "hash": hash::file_hash(&applied.bytes),
+        "hash": new_hash,
         "dry_run": dry_run,
     });
     Ok(r)
