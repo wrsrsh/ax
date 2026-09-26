@@ -20,6 +20,15 @@ pub fn is_binary(b: &[u8]) -> bool {
     b.iter().take(8192).any(|&c| c == 0)
 }
 
+/// `1 line`, `2 lines`.
+pub fn lines_label(n: usize) -> String {
+    if n == 1 {
+        "1 line".into()
+    } else {
+        format!("{n} lines")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

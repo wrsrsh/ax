@@ -38,9 +38,22 @@ enum Cmd {
     /// symbol outline of a file or dir
     Outline { path: String },
     /// jump to a symbol definition
-    Def { sym: String },
+    Def {
+        sym: String,
+        /// only under this dir (repeatable)
+        #[arg(long = "in")]
+        within: Vec<String>,
+    },
     /// find references to a symbol
-    Refs { sym: String },
+    Refs {
+        sym: String,
+        /// skip matches inside comments and strings
+        #[arg(long)]
+        code_only: bool,
+        /// only under this dir (repeatable)
+        #[arg(long = "in")]
+        within: Vec<String>,
+    },
     /// read files or line ranges with LINE:HASH anchors
     Read { paths: Vec<String> },
     /// apply anchored edit ops from stdin
@@ -75,9 +88,13 @@ fn run(ctx: &Ctx, cmd: Cmd) -> ax::Result<Report> {
             return ax::find::run(ctx, &args);
         }
         Cmd::Grep { .. } => "grep",
-        Cmd::Outline { .. } => "outline",
-        Cmd::Def { .. } => "def",
-        Cmd::Refs { .. } => "refs",
+        Cmd::Outline { path } => return ax::symbols::outline(ctx, &path),
+        Cmd::Def { sym, within } => return ax::symbols::def(ctx, &sym, &within),
+        Cmd::Refs {
+            sym,
+            code_only,
+            within,
+        } => return ax::symbols::refs(ctx, &sym, code_only, &within),
         Cmd::Read { .. } => "read",
         Cmd::Edit { .. } => "edit",
         Cmd::Write { .. } => "write",

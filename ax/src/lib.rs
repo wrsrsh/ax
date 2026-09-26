@@ -1,9 +1,12 @@
 pub mod config;
 pub mod find;
 pub mod hash;
+pub mod hits;
 pub mod map;
 pub mod output;
 pub mod repo;
+pub mod symbols;
+pub mod syntax;
 pub mod text;
 pub mod walk;
 
