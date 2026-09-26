@@ -105,6 +105,9 @@ pub struct Report {
     pub lines: Vec<String>,
     pub data: Value,
     pub summary: Summary,
+    /// output is still printed, but the exit code is 1 (e.g. one of several
+    /// files in `ax read` didn't exist)
+    pub failed: bool,
 }
 
 impl Report {
@@ -114,6 +117,7 @@ impl Report {
             lines: Vec::new(),
             data: Value::Null,
             summary: Summary::default(),
+            failed: false,
         }
     }
 

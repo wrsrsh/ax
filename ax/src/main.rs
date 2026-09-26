@@ -91,8 +91,16 @@ enum Cmd {
         #[arg(long = "in")]
         within: Vec<String>,
     },
-    /// read files or line ranges with LINE:HASH anchors
-    Read { paths: Vec<String> },
+    /// read files or line ranges (path:10-20) with LINE:HASH anchors
+    Read {
+        paths: Vec<String>,
+        /// read just this symbol (Class.method or name)
+        #[arg(long)]
+        sym: Option<String>,
+        /// whole file, no outline/window for long files
+        #[arg(long)]
+        full: bool,
+    },
     /// apply anchored edit ops from stdin
     Edit { path: String },
     /// write a whole file from stdin
@@ -100,7 +108,13 @@ enum Cmd {
     /// apply a multi-file patch from stdin
     Patch,
     /// git status + stat + capped hunks
-    Diff,
+    Diff {
+        /// every hunk, no cap
+        #[arg(long)]
+        full: bool,
+        /// limit to these paths
+        paths: Vec<String>,
+    },
     /// print the usage note for CLAUDE.md / AGENTS.md
     AgentHelp,
 }
@@ -162,11 +176,13 @@ fn run(ctx: &Ctx, cmd: Cmd) -> ax::Result<Report> {
             code_only,
             within,
         } => return ax::symbols::refs(ctx, &sym, code_only, &within),
-        Cmd::Read { .. } => "read",
+        Cmd::Read { paths, sym, full } => {
+            return ax::read::run(ctx, &paths, sym.as_deref(), full);
+        }
         Cmd::Edit { .. } => "edit",
         Cmd::Write { .. } => "write",
         Cmd::Patch => "patch",
-        Cmd::Diff => "diff",
+        Cmd::Diff { full, paths } => return ax::diff::run(ctx, full, &paths),
         Cmd::AgentHelp => "agent-help",
     };
     Err(AxError(format!("{name}: not built yet")))
@@ -187,6 +203,9 @@ fn main() {
             // `ax grep … | head` closing the pipe early is fine, not a panic
             use std::io::Write;
             let _ = std::io::stdout().lock().write_all(out.as_bytes());
+            if report.failed {
+                std::process::exit(1);
+            }
         }
         Err(e) => {
             if cli.json {

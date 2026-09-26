@@ -1,10 +1,12 @@
 pub mod config;
+pub mod diff;
 pub mod find;
 pub mod grep;
 pub mod hash;
 pub mod hits;
 pub mod map;
 pub mod output;
+pub mod read;
 pub mod repo;
 pub mod symbols;
 pub mod syntax;
