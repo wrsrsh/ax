@@ -38,8 +38,12 @@ def test_summarize():
 
 
 def _tasks(n):
+    """validated tasks whose docker image is built on this machine."""
     f = TASKS / "tasks.jsonl"
-    return [json.loads(l) for l in f.open()][:n] if f.exists() else []
+    if not f.exists() or not shutil.which("docker"):
+        return []
+    have = lambda img: subprocess.run(["docker", "image", "inspect", img], capture_output=True).returncode == 0  # noqa: E731
+    return [t for t in (json.loads(l) for l in f.open()) if have(t["image"])][:n]
 
 
 def vandal_diff(task: dict, tmp) -> str:
@@ -58,7 +62,7 @@ def vandal_diff(task: dict, tmp) -> str:
         subprocess.run(["git", "-C", str(repo), "worktree", "remove", "--force", str(wt)], check=False)
 
 
-@pytest.mark.skipif(not shutil.which("docker") or not _tasks(1), reason="needs docker + validated tasks")
+@pytest.mark.skipif(not _tasks(1), reason="needs docker + a locally built task image")
 @pytest.mark.parametrize("task", _tasks(2), ids=lambda t: t["id"])
 def test_grade_real_task(task, tmp_path):
     gold = grade(task, task["gold_patch"])
