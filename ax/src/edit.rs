@@ -110,8 +110,6 @@ pub struct Applied {
     pub regions: Vec<(usize, usize)>,
 }
 
-// ---- parsing ---------------------------------------------------------------
-
 fn parse_anchor(tok: &str, cfg: &Config) -> Result<Anchor, Refusal> {
     let (n, h) = match tok.split_once(':') {
         Some((n, h)) => (n, Some(h)),
@@ -247,8 +245,6 @@ pub fn parse_ops(input: &[u8], cfg: &Config) -> Result<Vec<Op>, Refusal> {
     Ok(ops)
 }
 
-// ---- the file model --------------------------------------------------------
-
 /// a file as lines that each remember their own terminator.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Doc {
@@ -353,8 +349,6 @@ impl Doc {
         out
     }
 }
-
-// ---- resolving anchors -------------------------------------------------------
 
 fn hash_of(doc: &Doc, idx: usize) -> String {
     line_hash(&doc.lines[idx].0)
@@ -548,8 +542,6 @@ fn find_splice(doc: &Doc, find: &[u8], with: &[u8], order: usize) -> Result<Spli
     })
 }
 
-// ---- applying ----------------------------------------------------------------
-
 /// resolve + apply ops to `src`. pure: no disk, no parse guard.
 pub fn apply(src: &[u8], ops: &[Op], cfg: &Config) -> Result<Applied, Refusal> {
     let doc = Doc::parse(src);
@@ -604,8 +596,6 @@ pub fn around(cfg: &Config, src: &[u8], line: usize, radius: usize) -> Vec<Strin
         .map(|n| format!("  {}", anchored(cfg, n, lines[n - 1])))
         .collect()
 }
-
-// ---- the command -------------------------------------------------------------
 
 fn refusal_report(ctx: &Ctx, rel: &str, src: &[u8], why: &Refusal) -> Report {
     let mut r = Report::new("edit");
