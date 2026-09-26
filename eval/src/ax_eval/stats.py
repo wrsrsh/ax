@@ -28,7 +28,7 @@ REJECTS = ("stale", "ambiguous", "parse-rejected", "no-match")
 
 
 def clean(rows: list[dict]) -> list[dict]:
-    return [r for r in rows if not r.get("infra_failure")]
+    return [r for r in rows if not r.get("infra_failure") and not r.get("dry")]
 
 
 def value(row: dict, metric: str) -> float | None:
@@ -217,11 +217,13 @@ def main(argv=None) -> int:
     p.add_argument("runs", nargs="?", type=Path, default=RUNS / "runs.jsonl")
     p.add_argument("--seed", type=int, default=SEED)
     p.add_argument("--boot", type=int, default=N_BOOT)
+    p.add_argument("--split", default="heldout", choices=("heldout", "dev", "all"))
     a = p.parse_args(argv)
     if not a.runs.exists():
         print(f"no runs file at {a.runs}", file=sys.stderr)
         return 1
-    print(json.dumps(summary(jsonl(a.runs), a.boot, a.seed), indent=2))
+    rows = [r for r in jsonl(a.runs) if a.split == "all" or r.get("split") == a.split]
+    print(json.dumps(summary(rows, a.boot, a.seed), indent=2))
     return 0
 
 

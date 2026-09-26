@@ -110,8 +110,9 @@ def test_report_renders(fake):
               "## wins and losses", "## verdict", "## limitations"]:
         assert h in md, h
     assert "codex 0.156.0" in md and "gpt-6-astra, effort medium" in md and "abc1234" in md
-    assert "5 in final.jsonl (1 dev, 4 held-out); 4 with usable runs here" in md
-    assert "26 total, 24 usable, 1 infra failures, 1 incomplete" in md
+    assert "5 in final.jsonl (1 dev, 4 held-out); 3 with usable runs here" in md
+    assert "26 real (0 dry runs ignored), 24 usable" in md
+    assert "1 infra failures, 1 incomplete" in md
     assert "| A | 8 | 4 | 50.0% |" in md and "| B | 8 | 4 | 75.0% |" in md
     assert "| B/A | tokens | 0.70x |" in md and "| C/A | tokens | 1.00x |" in md
     assert "| B | 8 | 8 (100.0%) | 25.0% | 0 | 8 |" in md

@@ -128,8 +128,10 @@ def from_stats(real: dict, fb: dict) -> dict:
         b, a = pair.split("-")
         if v.get("diff") is None:
             continue
-        if a != base_of(b):
+        if base_of(a) != base_of(b):
             out.setdefault("raw_vs_code", {}).setdefault(pair, {})["pass_rate"] = {"diff": v["diff"], "ci": (v["lo"], v["hi"])}
+            continue
+        if a != base_of(b):
             continue
         ci = (v["lo"], v["hi"])
         out["guardrail"][b] = {"diff": v["diff"], "ci": ci, "margin": MARGIN, "tasks": None, "ok": ci[0] >= -MARGIN}
@@ -139,7 +141,12 @@ def from_stats(real: dict, fb: dict) -> dict:
             if v.get("median") is None:
                 continue
             b, a = pair.split("/")
-            dest = out["ratios"] if a == base_of(b) else out.setdefault("raw_vs_code", {})
+            if a == base_of(b):
+                dest = out["ratios"]
+            elif base_of(a) != base_of(b):
+                dest = out.setdefault("raw_vs_code", {})
+            else:
+                continue
             dest.setdefault(pair, {})[metric] = {"median": v["median"], "ci": (v["lo"], v["hi"]), "n": v.get("n_tasks")}
     out["adoption"] = {
         s: {**fb["adoption"].get(s, {}), "runs": v["n_runs"], "adoption": v["share_runs_with_ax"],
@@ -241,10 +248,14 @@ def wins_losses(rows: list[dict], setup: str, key: str, runs_link) -> list[str]:
     return out
 
 
-def render(rows: list[dict], runs_dir: Path = RUNS, out: Path = REPORT / "REPORT.md", tasks: Path = TASKS / "final.jsonl") -> str:
-    good = [r for r in rows if usable(r)]
-    infra = [r for r in rows if r.get("infra_failure")]
-    incomplete = [r for r in rows if not r.get("complete") and not r.get("infra_failure")]
+def render(rows: list[dict], runs_dir: Path = RUNS, out: Path = REPORT / "REPORT.md", tasks: Path = TASKS / "final.jsonl", subset: str | None = "heldout") -> str:
+    """`subset` picks the rows the numbers are computed from (default held-out only;
+    None for everything). dry runs (stub, fake api) never count."""
+    real = [r for r in rows if not r.get("dry")]
+    allgood = [r for r in rows if usable(r)]
+    good = [r for r in allgood if subset is None or r.get("split") == subset]
+    infra = [r for r in real if r.get("infra_failure")]
+    incomplete = [r for r in real if not r.get("complete") and not r.get("infra_failure")]
     s, source = summary(good)
     setups = setups_of(good)
     others = [x for x in setups if x != base_of(x)]
@@ -260,15 +271,16 @@ def render(rows: list[dict], runs_dir: Path = RUNS, out: Path = REPORT / "REPORT
     L = ["# ax eval report", ""]
     L += [
         f"generated {date.today().isoformat()} from `{Path(runs_dir).name}/runs.jsonl`.", "",
-        f"- agent: {distinct(rows, 'agent')}, codex {distinct(rows, 'codex_version')}",
-        f"- model: {distinct(rows, 'model')}, effort {distinct(rows, 'effort')}",
-        f"- ax commit: {distinct(rows, 'ax_commit')}",
+        f"- agent: {distinct(good, 'agent')}, codex {distinct(good, 'codex_version')}",
+        f"- model: {distinct(good, 'model')}, effort {distinct(good, 'effort')}",
+        f"- ax commit: {distinct(good, 'ax_commit')}",
         (
             f"- tasks: {sum(split.values())} in final.jsonl ({split.get('dev', 0)} dev, {split.get('heldout', 0)} held-out); "
             f"{len({r['task_id'] for r in good})} with usable runs here"
         ),
         (
-            f"- runs: {len(rows)} total, {len(good)} usable, {len(infra)} infra failures, {len(incomplete)} incomplete, "
+            f"- runs: {len(real)} real ({len(rows) - len(real)} dry runs ignored), {len(allgood)} usable, "
+            f"{len(good)} in this report ({subset or 'all'} split), {len(infra)} infra failures, {len(incomplete)} incomplete, "
             f"{sum(bool(r.get('timed_out')) for r in good)} timed out (counted as unresolved)"
         ),
         f"- setups: {', '.join(setups) or 'none'}. A is the baseline (Ar for the raw-tools family); ratios and deltas are paired by task against it.",
@@ -290,7 +302,7 @@ def render(rows: list[dict], runs_dir: Path = RUNS, out: Path = REPORT / "REPORT
     for x in setups:
         cells = [x]
         for sp in ("dev", "heldout"):
-            rs = [r for r in good if r["setup"] == x and r.get("split") == sp]
+            rs = [r for r in allgood if r["setup"] == x and r.get("split") == sp]
             k = sum(bool(r["resolved"]) for r in rs)
             cells.append(f"{pct(k / len(rs))} ({k}/{len(rs)})" if rs else "-")
         body.append(cells)
@@ -341,6 +353,9 @@ def render(rows: list[dict], runs_dir: Path = RUNS, out: Path = REPORT / "REPORT
             L += [f"### {x} vs {base_of(x)}: {m}", ""] + wins_losses(good, x, m, runs_link) + [""]
 
     L += ["## verdict", "", VERDICT_RULE, ""]
+    rates = [e.get("pass_rate") for e in s["setups"].values() if e.get("pass_rate") is not None]
+    if rates and min(rates) >= 0.95:
+        L += ["- pass rate is at the ceiling (95%+ in every setup), so it can't separate the setups here; the comparison rests on tokens, cost, turns and wall time.", ""]
     if not others:
         L.append("- no ax setup runs yet.")
     for x in others:
@@ -366,11 +381,12 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--out", type=Path, default=REPORT / "REPORT.md")
     p.add_argument("--tasks", type=Path, default=TASKS / "final.jsonl")
     p.add_argument("--no-collect", action="store_true", help="use the existing runs.jsonl as is")
+    p.add_argument("--split", default="heldout", choices=("heldout", "dev", "all"))
     a = p.parse_args(argv)
     if not a.no_collect:
         collect(a.runs, a.out.parent, a.tasks)
     rows = load(a.runs)
-    render(rows, a.runs, a.out, a.tasks)
+    render(rows, a.runs, a.out, a.tasks, None if a.split == "all" else a.split)
     print(f"wrote {a.out} ({len(rows)} runs)")
     return 0
 

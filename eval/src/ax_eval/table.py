@@ -29,7 +29,7 @@ METRICS = [
     "tool_calls", "failed_commands", "failed_patches", "fallback_rate", "script_calls", "ax_rejections", "cost", "completed",
 ]
 DICTS = ["tools", "ax_calls", "ax_outcomes"]
-COLUMNS = MANIFEST + ["split"] + GRADE + ["grade_error", "failing"] + METRICS + [
+COLUMNS = MANIFEST + ["split", "dry"] + GRADE + ["grade_error", "failing"] + METRICS + [
     "agent_error", "wall_seconds", "tokens", "turns", "ax_calls_total",
 ] + DICTS + ["complete", "missing"]
 
@@ -69,6 +69,10 @@ def row(run: Path, split: dict[str, str] | None = None) -> dict:
 
     r = {k: m.get(k) for k in MANIFEST}
     r["run_id"] = r["run_id"] or run.name
+    # the runner writes the task under "task"
+    r["task_id"] = m.get("task_id") or m.get("task")
+    # stub runs and codex against the fake api cost nothing and prove nothing
+    r["dry"] = m.get("agent") != "codex" or any(h in (m.get("api_base_url") or "") for h in ("host.docker.internal", "127.0.0.1", "localhost"))
     r["timed_out"] = bool(r["timed_out"])
     r["infra_failure"] = bool(r["infra_failure"])
     r["split"] = (split or {}).get(r["task_id"])
@@ -91,8 +95,8 @@ def row(run: Path, split: dict[str, str] | None = None) -> dict:
 
 
 def usable(r: dict) -> bool:
-    """rows that count toward results: all files there, no infra failure."""
-    return bool(r.get("complete")) and not r.get("infra_failure")
+    """rows that count toward results: all files there, no infra failure, a real model."""
+    return bool(r.get("complete")) and not r.get("infra_failure") and not r.get("dry")
 
 
 def _avg(rs: list[dict], k: str) -> float | None:
