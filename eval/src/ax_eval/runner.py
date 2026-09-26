@@ -162,7 +162,7 @@ def stage_home(stage: Path, setup: str, base_url: str, env_key: str, catalog_src
 def image_versions(name: str, image: str, with_ax: bool) -> tuple[str | None, str | None]:
     r = docker("exec", name, "codex", "--version", check=False)
     codex_v = r.stdout.strip() or None
-    label = docker("image", "inspect", "-f", '{{index .Config.Labels "ax.commit"}}', image, check=False).stdout.strip()
+    label = docker("image", "inspect", "-f", '{{index .Config.Labels "org.ax.commit"}}', image, check=False).stdout.strip()
     ax_v = label if label and label != "<no value>" else None
     if not ax_v and with_ax:
         ax_v = docker("exec", name, "ax", "--version", check=False).stdout.strip() or None
