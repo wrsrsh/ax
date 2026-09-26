@@ -39,14 +39,8 @@ from ax_eval.mine import TASKS
 from ax_eval.parity import EVAL
 from ax_eval.parse import metrics, parse_events
 
-try:
-    from ax_eval.images import agent_image
-except ImportError:
-    from ax_eval._fallback import agent_image
-try:
-    from ax_eval.setups import SETUPS, agents_md, codex_args, uses_ax, write_codex_home
-except ImportError:
-    from ax_eval._fallback import SETUPS, agents_md, codex_args, uses_ax, write_codex_home
+from ax_eval.images import agent_image
+from ax_eval.setups import SETUPS, agents_md, codex_args, uses_ax, write_codex_home
 
 RUNS = EVAL / "runs"
 LEDGER = RUNS / "ledger.jsonl"
@@ -96,15 +90,14 @@ def plan(tasks: list, setups: list[str], repeats: int, seed: int) -> list[tuple[
     return items
 
 
-def load_prices(path: Path = PRICES, model: str = MODEL) -> dict:
-    """$ per 1M tokens: input, cached_input, output. zeros (and a warning) if there's no file."""
+def load_prices(path: Path = PRICES) -> dict:
+    """$ per 1M tokens (input, cached_input, cache_write, output) from eval/prices.json; zeros and a warning without it."""
+    keys = ("input", "cached_input", "cache_write", "output")
     if not path.exists():
         print(f"warning: no {path.name}, costs will be 0", file=sys.stderr)
-        return {"input": 0.0, "cached_input": 0.0, "output": 0.0}
-    p = json.loads(path.read_text())
-    if model in p:
-        p = p[model]
-    return {k: float(p[k]) for k in ("input", "cached_input", "output")}
+        return dict.fromkeys(keys, 0.0)
+    p = json.loads(path.read_text()).get("per_million", {})
+    return {k: float(p.get(k, 0.0)) for k in keys}
 
 
 def read_ledger(path: Path) -> list[dict]:
