@@ -22,4 +22,4 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-markers = ["docker: builds and runs docker images"]
+markers = ["docker: needs docker and locally built task images (runs at $0)"]
