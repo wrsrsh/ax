@@ -17,8 +17,22 @@ struct Cli {
 enum Cmd {
     /// one-screen overview of a repo
     Map { dir: Option<String> },
-    /// find files by name or glob
-    Find { pattern: String },
+    /// find files by name (smart-case substring) or rg-style glob
+    Find {
+        pattern: Option<String>,
+        /// only these extensions (comma-separated or repeated)
+        #[arg(long)]
+        ext: Vec<String>,
+        /// only under this dir (repeatable)
+        #[arg(long = "in")]
+        within: Vec<String>,
+        /// modified within this long (30m, 1h, 2d)
+        #[arg(long)]
+        changed: Option<String>,
+        /// include hidden and gitignored files
+        #[arg(long)]
+        all: bool,
+    },
     /// search file contents (rg-compatible flags)
     Grep { pattern: String },
     /// symbol outline of a file or dir
@@ -41,10 +55,25 @@ enum Cmd {
     AgentHelp,
 }
 
-fn run(_ctx: &Ctx, cmd: Cmd) -> ax::Result<Report> {
+fn run(ctx: &Ctx, cmd: Cmd) -> ax::Result<Report> {
     let name = match cmd {
-        Cmd::Map { .. } => "map",
-        Cmd::Find { .. } => "find",
+        Cmd::Map { dir } => return ax::map::run(ctx, dir.as_deref()),
+        Cmd::Find {
+            pattern,
+            ext,
+            within,
+            changed,
+            all,
+        } => {
+            let args = ax::find::FindArgs {
+                pattern,
+                ext,
+                within,
+                changed,
+                all,
+            };
+            return ax::find::run(ctx, &args);
+        }
         Cmd::Grep { .. } => "grep",
         Cmd::Outline { .. } => "outline",
         Cmd::Def { .. } => "def",

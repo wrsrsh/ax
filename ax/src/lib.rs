@@ -1,7 +1,11 @@
 pub mod config;
+pub mod find;
 pub mod hash;
+pub mod map;
 pub mod output;
 pub mod repo;
+pub mod text;
+pub mod walk;
 
 use std::path::PathBuf;
 

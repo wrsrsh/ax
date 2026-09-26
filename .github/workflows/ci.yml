@@ -12,6 +12,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
+      - run: sudo apt-get install -y ripgrep
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: ax
