@@ -74,3 +74,5 @@ def test_ax_log_and_metrics(tmp_path):
 def test_cost_formula():
     row = {"uncached_input_tokens": 1_000_000, "cached_input_tokens": 1_000_000, "output_tokens": 1_000_000}
     assert cost(row, {"input": 1, "cached_input": 0.1, "output": 4}) == 5.1
+    row["cache_write_input_tokens"] = 1_000_000
+    assert cost(row, {"input": 1, "cached_input": 0.1, "cache_write": 1.25, "output": 4}) == 6.35

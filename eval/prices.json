@@ -5,7 +5,8 @@
   "per_million": {
     "input": 10.0,
     "cached_input": 1.0,
-    "output": 50.0
+    "output": 50.0,
+    "cache_write": 12.5
   },
   "source": "https://azure.microsoft.com/en-us/blog/gpt-6-astra-sol-and-luna-for-production-agents-in-microsoft-foundry/",
   "checked": "2026-09-26",

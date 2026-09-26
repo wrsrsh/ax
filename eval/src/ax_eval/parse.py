@@ -84,6 +84,7 @@ def parse_events(lines: list[str]) -> dict:
     row.update(
         input_tokens=usage["input_tokens"],
         cached_input_tokens=usage["cached_input_tokens"],
+        cache_write_input_tokens=usage["cache_write_input_tokens"],
         uncached_input_tokens=usage["input_tokens"] - usage["cached_input_tokens"],
         output_tokens=usage["output_tokens"],
         reasoning_tokens=usage["reasoning_output_tokens"],
@@ -116,10 +117,11 @@ def fallback_rate(tools: dict) -> float | None:
 
 
 def cost(row: dict, prices: dict) -> float:
-    """prices in $ per 1M tokens: input, cached_input, output (reasoning is billed as output)."""
+    """prices in $ per 1M tokens: input, cached_input, cache_write, output (reasoning is billed as output)."""
     return (
         row["uncached_input_tokens"] * prices["input"]
         + row["cached_input_tokens"] * prices["cached_input"]
+        + row.get("cache_write_input_tokens", 0) * prices.get("cache_write", 0)
         + row["output_tokens"] * prices["output"]
     ) / 1e6
 
