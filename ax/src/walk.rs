@@ -6,6 +6,7 @@
 use crate::{AxError, Ctx, Result, repo};
 use ignore::WalkBuilder;
 use ignore::overrides::OverrideBuilder;
+use ignore::types::TypesBuilder;
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Default)]
@@ -14,6 +15,8 @@ pub struct WalkOpts {
     pub roots: Vec<String>,
     /// rg-style `-g` globs; `!glob` excludes.
     pub globs: Vec<String>,
+    /// rg file types (`-t ts`), using rg's built-in type table.
+    pub types: Vec<String>,
     /// include hidden + ignored files.
     pub all: bool,
 }
@@ -60,6 +63,19 @@ pub fn builder(ctx: &Ctx, opts: &WalkOpts) -> Result<WalkBuilder> {
         }
         let ov = ob.build().map_err(|e| AxError(e.to_string()))?;
         b.overrides(ov);
+    }
+    if !opts.types.is_empty() {
+        let mut tb = TypesBuilder::new();
+        tb.add_defaults();
+        for t in &opts.types {
+            if !tb.definitions().iter().any(|d| d.name() == t) {
+                return Err(AxError(format!(
+                    "unknown file type {t:?} (rg's names: ts, js, py, rust, go, …)"
+                )));
+            }
+            tb.select(t);
+        }
+        b.types(tb.build().map_err(|e| AxError(e.to_string()))?);
     }
     Ok(b)
 }

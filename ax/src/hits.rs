@@ -52,32 +52,38 @@ pub fn symbols_for(cfg: &Config, rel: &str, src: &[u8]) -> Vec<Symbol> {
         .unwrap_or_default()
 }
 
+/// with context lines around, match lines get a `>` in the gutter so you can
+/// tell them apart; without context every line is a match and the gutter is
+/// blank.
 pub fn render(cfg: &Config, hits: &[Hit]) -> Vec<String> {
     let mut out = Vec::new();
     let mut cur_file: Option<&str> = None;
     let mut cur_sym: Option<&str> = None;
     let mut last_line = 0usize;
+    let marks = hits.iter().any(|h| h.context);
     for h in hits {
         let sym = h.symbol.as_ref().map(|s| s.path.as_str());
         if cur_file != Some(h.rel.as_str()) {
             out.push(h.rel.clone());
             cur_file = Some(&h.rel);
             cur_sym = None;
-        } else if h.line > last_line + 1 && (sym == cur_sym || h.symbol.is_none()) {
-            // gap inside the same symbol (or at top level); a new `@` header
-            // already makes the jump obvious
+        } else if h.line > last_line + 1 && sym == cur_sym {
+            // gap inside the same symbol; a new `@` header already makes a
+            // jump obvious
             out.push("  …".into());
         }
         if sym != cur_sym {
-            if let Some(s) = &h.symbol {
-                out.push(format!(
+            match &h.symbol {
+                Some(s) => out.push(format!(
                     "  @ {}  ({} {}-{})",
                     s.path, s.kind, s.start, s.end
-                ));
+                )),
+                None => out.push("  @ (top level)".into()),
             }
             cur_sym = sym;
         }
-        out.push(format!("  {}", anchored(cfg, h.line, &h.bytes)));
+        let gutter = if marks && !h.context { "> " } else { "  " };
+        out.push(format!("{gutter}{}", anchored(cfg, h.line, &h.bytes)));
         last_line = h.line;
     }
     out

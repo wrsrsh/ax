@@ -29,6 +29,15 @@ pub fn lines_label(n: usize) -> String {
     }
 }
 
+/// `1 file`, `3 files`.
+pub fn plural(n: usize, noun: &str) -> String {
+    if n == 1 {
+        format!("1 {noun}")
+    } else {
+        format!("{n} {noun}s")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

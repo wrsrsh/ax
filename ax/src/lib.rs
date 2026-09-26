@@ -1,5 +1,6 @@
 pub mod config;
 pub mod find;
+pub mod grep;
 pub mod hash;
 pub mod hits;
 pub mod map;

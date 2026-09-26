@@ -257,7 +257,7 @@ pub fn refs(ctx: &Ctx, sym: &str, code_only: bool, within: &[String]) -> Result<
         "ref",
         c.total,
         c.items.len(),
-        &format!("to {name} in {n_files} files"),
+        &format!("to {name} in {}", text::plural(n_files, "file")),
         "--in <dir> or --code-only",
     );
     if c.total > 0 {

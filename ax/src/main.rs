@@ -34,7 +34,44 @@ enum Cmd {
         all: bool,
     },
     /// search file contents (rg-compatible flags)
-    Grep { pattern: String },
+    Grep {
+        pattern: String,
+        /// files or dirs to search, like rg's trailing paths (same as --in)
+        paths: Vec<String>,
+        /// treat the pattern as a literal string
+        #[arg(short = 'F', long)]
+        fixed_strings: bool,
+        /// whole words only
+        #[arg(short = 'w', long)]
+        word_regexp: bool,
+        /// case-insensitive
+        #[arg(short = 'i', long)]
+        ignore_case: bool,
+        /// case-insensitive unless the pattern has uppercase
+        #[arg(short = 'S', long)]
+        smart_case: bool,
+        /// only files of this rg type (ts, py, rust, go, …; repeatable)
+        #[arg(short = 't', long = "type")]
+        types: Vec<String>,
+        /// include/exclude files by glob, rg-style (repeatable, `!` excludes)
+        #[arg(short = 'g', long = "glob")]
+        globs: Vec<String>,
+        /// only under this dir (repeatable)
+        #[arg(long = "in")]
+        within: Vec<String>,
+        /// lines of context around each hit
+        #[arg(short = 'C', long, default_value_t = 0)]
+        context: usize,
+        /// list matching files only
+        #[arg(short = 'l', long)]
+        files_with_matches: bool,
+        /// count hits per file
+        #[arg(short = 'c', long)]
+        count: bool,
+        /// include hidden and gitignored files
+        #[arg(long)]
+        all: bool,
+    },
     /// symbol outline of a file or dir
     Outline { path: String },
     /// jump to a symbol definition
@@ -87,7 +124,37 @@ fn run(ctx: &Ctx, cmd: Cmd) -> ax::Result<Report> {
             };
             return ax::find::run(ctx, &args);
         }
-        Cmd::Grep { .. } => "grep",
+        Cmd::Grep {
+            pattern,
+            paths,
+            fixed_strings,
+            word_regexp,
+            ignore_case,
+            smart_case,
+            types,
+            globs,
+            within,
+            context,
+            files_with_matches,
+            count,
+            all,
+        } => {
+            let args = ax::grep::GrepArgs {
+                pattern,
+                fixed: fixed_strings,
+                word: word_regexp,
+                ignore_case,
+                smart_case,
+                types,
+                globs,
+                within: within.into_iter().chain(paths).collect(),
+                context,
+                files_only: files_with_matches,
+                count,
+                all,
+            };
+            return ax::grep::run(ctx, &args);
+        }
         Cmd::Outline { path } => return ax::symbols::outline(ctx, &path),
         Cmd::Def { sym, within } => return ax::symbols::def(ctx, &sym, &within),
         Cmd::Refs {
@@ -117,7 +184,9 @@ fn main() {
             } else {
                 report.render_text()
             };
-            print!("{out}");
+            // `ax grep … | head` closing the pipe early is fine, not a panic
+            use std::io::Write;
+            let _ = std::io::stdout().lock().write_all(out.as_bytes());
         }
         Err(e) => {
             if cli.json {
