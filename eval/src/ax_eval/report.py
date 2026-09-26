@@ -20,12 +20,12 @@ from pathlib import Path
 from statistics import mean, median
 
 from ax_eval import stats
+from ax_eval.setups import base_of, raw_tools
 from ax_eval.table import collect, load, splits, usable
 from ax_eval.util import REPORT, RUNS, TASKS
 
 METRICS = ["tokens", "cost", "turns", "wall_seconds"]
-BASE = "A"
-MARGIN = 0.05  # guardrail: an ax setup may lose at most 5 pp of pass rate vs A
+MARGIN = 0.05  # guardrail: an ax setup may lose at most 5 pp of pass rate vs its baseline (A, or Ar for raw tools)
 TOP = 3
 BOOT = 2000
 
@@ -75,7 +75,7 @@ def by_task(rows: list[dict], setup: str, key: str) -> dict[str, float]:
 
 
 def paired(rows: list[dict], setup: str, key: str) -> list[tuple[str, float, float]]:
-    a, x = by_task(rows, BASE, key), by_task(rows, setup, key)
+    a, x = by_task(rows, base_of(setup), key), by_task(rows, setup, key)
     return [(t, a[t], x[t]) for t in sorted(a.keys() & x.keys())]
 
 
@@ -98,8 +98,9 @@ def fallback_summary(rows: list[dict]) -> dict:
             "runs": len(rs), "used_ax": len(used), "adoption": len(used) / len(rs),
             "fallback_rate": median(fb) if fb else None,
             "ax_rejections": sum(r.get("ax_rejections") or 0 for r in rs), "ax_calls": dict(calls),
+            "script_calls": sum(r.get("script_calls") or 0 for r in rs),
         }
-        if s == BASE:
+        if s == base_of(s):
             continue
         diffs = [x - a for _, a, x in paired(rows, s, "resolved")]
         ci = boot_ci(diffs, mean)
@@ -107,10 +108,10 @@ def fallback_summary(rows: list[dict]) -> dict:
             "diff": mean(diffs) if diffs else None, "ci": ci, "margin": MARGIN, "tasks": len(diffs),
             "ok": None if ci is None else ci[0] >= -MARGIN,
         }
-        out["ratios"][f"{s}/{BASE}"] = {}
+        out["ratios"][f"{s}/{base_of(s)}"] = {}
         for m in METRICS:
             rat = [x / a for _, a, x in paired(rows, s, m) if a > 0]
-            out["ratios"][f"{s}/{BASE}"][m] = {"median": median(rat) if rat else None, "ci": boot_ci(rat, median), "n": len(rat)}
+            out["ratios"][f"{s}/{base_of(s)}"][m] = {"median": median(rat) if rat else None, "ci": boot_ci(rat, median), "n": len(rat)}
     return out
 
 
@@ -125,16 +126,21 @@ def from_stats(real: dict, fb: dict) -> dict:
     out["guardrail"] = {}
     for pair, v in (real.get("pass_rate_diff") or {}).items():
         b, a = pair.split("-")
-        if a != BASE or v.get("diff") is None:
+        if v.get("diff") is None:
+            continue
+        if a != base_of(b):
+            out.setdefault("raw_vs_code", {}).setdefault(pair, {})["pass_rate"] = {"diff": v["diff"], "ci": (v["lo"], v["hi"])}
             continue
         ci = (v["lo"], v["hi"])
         out["guardrail"][b] = {"diff": v["diff"], "ci": ci, "margin": MARGIN, "tasks": None, "ok": ci[0] >= -MARGIN}
     out["ratios"] = {}
     for metric, pairs in (real.get("ratios") or {}).items():
         for pair, v in pairs.items():
-            if not pair.endswith(f"/{BASE}") or v.get("median") is None:
+            if v.get("median") is None:
                 continue
-            out["ratios"].setdefault(pair, {})[metric] = {"median": v["median"], "ci": (v["lo"], v["hi"]), "n": v.get("n_tasks")}
+            b, a = pair.split("/")
+            dest = out["ratios"] if a == base_of(b) else out.setdefault("raw_vs_code", {})
+            dest.setdefault(pair, {})[metric] = {"median": v["median"], "ci": (v["lo"], v["hi"]), "n": v.get("n_tasks")}
     out["adoption"] = {
         s: {**fb["adoption"].get(s, {}), "runs": v["n_runs"], "adoption": v["share_runs_with_ax"],
             "used_ax": round(v["share_runs_with_ax"] * v["n_runs"]), "fallback_rate": v.get("mean_fallback_rate")}
@@ -241,14 +247,14 @@ def render(rows: list[dict], runs_dir: Path = RUNS, out: Path = REPORT / "REPORT
     incomplete = [r for r in rows if not r.get("complete") and not r.get("infra_failure")]
     s, source = summary(good)
     setups = setups_of(good)
-    others = [x for x in setups if x != BASE]
+    others = [x for x in setups if x != base_of(x)]
     split = Counter(splits(tasks).values())
 
     def link(run_id: str) -> str:
         return os.path.relpath(Path(runs_dir) / run_id / "events.jsonl", Path(out).parent)
 
     def runs_link(task: str, setup: str) -> str:
-        rs = sorted((r for r in good if r["task_id"] == task and r["setup"] in (BASE, setup)), key=lambda r: (r["setup"], r.get("rep") or 0))
+        rs = sorted((r for r in good if r["task_id"] == task and r["setup"] in (base_of(setup), setup)), key=lambda r: (r["setup"], r.get("rep") or 0))
         return " ".join(f"[{r['setup']}{r.get('rep') if r.get('rep') is not None else ''}]({link(r['run_id'])})" for r in rs)
 
     L = ["# ax eval report", ""]
@@ -265,7 +271,7 @@ def render(rows: list[dict], runs_dir: Path = RUNS, out: Path = REPORT / "REPORT
             f"- runs: {len(rows)} total, {len(good)} usable, {len(infra)} infra failures, {len(incomplete)} incomplete, "
             f"{sum(bool(r.get('timed_out')) for r in good)} timed out (counted as unresolved)"
         ),
-        f"- setups: {', '.join(setups) or 'none'}. A is the baseline; ratios and deltas are paired by task against A.",
+        f"- setups: {', '.join(setups) or 'none'}. A is the baseline (Ar for the raw-tools family); ratios and deltas are paired by task against it.",
         "",
     ]
 
@@ -297,10 +303,10 @@ def render(rows: list[dict], runs_dir: Path = RUNS, out: Path = REPORT / "REPORT
         _, detail = verdict_pass(e)
         L.append(f"- {x}: {status}. pass rate {detail}; allowed loss {100 * e['margin']:.0f} pp.")
     if not g:
-        L.append("no ax setup to compare against A.")
+        L.append("no ax setup to compare against its baseline.")
     L.append("")
 
-    L += ["## ratios vs A", "", "median over tasks of (setup mean / A mean); below 1 means the ax setup used less.", ""]
+    L += ["## ratios vs baseline", "", "median over tasks of (setup mean / baseline mean); below 1 means the ax setup used less.", ""]
     body = []
     for comp, ms in sorted(s["ratios"].items()):
         for m in METRICS:
@@ -308,19 +314,31 @@ def render(rows: list[dict], runs_dir: Path = RUNS, out: Path = REPORT / "REPORT
             body.append([comp, m, ratio(e.get("median")), ci_str(e.get("ci"), ratio), e.get("n", "-")])
     L += (table(["comparison", "metric", "median ratio", "95% CI", "tasks"], body) if body else ["no paired tasks."]) + [""]
 
-    L += ["## adoption", "", "fallback rate = share of file reads/searches/edits that didn't go through ax.", ""]
+    if s.get("raw_vs_code"):
+        L += ["## code mode vs raw tools", "",
+              "same letter, codex's code mode (one `exec` js tool) vs plain function tools. paired by task; pass-rate delta and median ratios.", ""]
+        body = []
+        for comp, ms in sorted(s["raw_vs_code"].items()):
+            for m, e in ms.items():
+                if m == "pass_rate":
+                    body.append([comp, m, f"{e['diff']:+.3f}", ci_str(e.get("ci"), lambda v: f"{v:+.3f}"), "-"])
+                else:
+                    body.append([comp, m, ratio(e.get("median")), ci_str(e.get("ci"), ratio), e.get("n", "-")])
+        L += table(["comparison", "metric", "value", "95% CI", "tasks"], body) + [""]
+
+    L += ["## adoption", "", "fallback rate = share of file reads/searches/edits that didn't go through ax; script calls = inline python/node doing that work.", ""]
     body = []
     for x in setups:
         e = s["adoption"].get(x) or {}
         top = ", ".join(f"{k} {v}" for k, v in Counter(e.get("ax_calls") or {}).most_common(4)) or "-"
         body.append([x, e.get("runs", "-"), f"{e.get('used_ax', '-')} ({pct(e.get('adoption'))})", pct(e.get("fallback_rate")),
-                     e.get("ax_rejections", "-"), top])
-    L += table(["setup", "runs", "runs using ax", "median fallback rate", "ax rejections", "top ax commands"], body) + [""]
+                     e.get("script_calls", "-"), e.get("ax_rejections", "-"), top])
+    L += table(["setup", "runs", "runs using ax", "median fallback rate", "script calls", "ax rejections", "top ax commands"], body) + [""]
 
-    L += ["## wins and losses", "", f"top {TOP} tasks per metric, by per-task ratio (or pass-rate delta) against A.", ""]
+    L += ["## wins and losses", "", f"top {TOP} tasks per metric, by per-task ratio (or pass-rate delta) against the baseline.", ""]
     for x in others:
         for m in ["resolved"] + METRICS:
-            L += [f"### {x} vs A: {m}", ""] + wins_losses(good, x, m, runs_link) + [""]
+            L += [f"### {x} vs {base_of(x)}: {m}", ""] + wins_losses(good, x, m, runs_link) + [""]
 
     L += ["## verdict", "", VERDICT_RULE, ""]
     if not others:
@@ -329,9 +347,9 @@ def render(rows: list[dict], runs_dir: Path = RUNS, out: Path = REPORT / "REPORT
         v, d = verdict_pass(g.get(x))
         parts = [f"pass rate: {v}. {d}"]
         for m in METRICS:
-            v, d = verdict_metric((s["ratios"].get(f"{x}/{BASE}") or {}).get(m))
+            v, d = verdict_metric((s["ratios"].get(f"{x}/{base_of(x)}") or {}).get(m))
             parts.append(f"{m}: {v}. {d}")
-        L.append(f"- **{x} vs A**")
+        L.append(f"- **{x} vs {base_of(x)}**")
         L += [f"  - {p}" for p in parts]
     L.append("")
 

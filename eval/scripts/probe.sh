@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # isolation probe, run inside an agent container right before the agent starts.
-# env: PROBE_SETUP (A|B|C), PROBE_BASE (commit), PROBE_AGENTS_SHA (sha256 of the
+# env: PROBE_SETUP (A|B|C|Ar|Br|Cr), PROBE_BASE (commit), PROBE_AGENTS_SHA (sha256 of the
 # expected AGENTS.md), PROBE_HIDDEN (newline-separated test_patch paths),
 # PROBE_ENV_KEY (name of the api key var, must not be in the container env).
 set -u
@@ -33,7 +33,7 @@ done <<< "${PROBE_HIDDEN:-}"
 [ "$(git rev-parse HEAD)" = "$(git rev-parse "$PROBE_BASE^{commit}")" ] && ok "HEAD is base" || bad "HEAD is not base"
 
 case "$PROBE_SETUP" in
-  B|C) command -v ax >/dev/null && ok "ax on PATH" || bad "ax missing in $PROBE_SETUP" ;;
+  B*|C*) command -v ax >/dev/null && ok "ax on PATH" || bad "ax missing in $PROBE_SETUP" ;;
   *) command -v ax >/dev/null && bad "ax present in $PROBE_SETUP" || ok "no ax in $PROBE_SETUP" ;;
 esac
 

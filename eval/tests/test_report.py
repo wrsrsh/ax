@@ -106,7 +106,7 @@ def test_report_renders(fake):
     out = root / "report" / "REPORT.md"
     md = render(rows, runs, out, tasks)
     assert out.read_text() == md
-    for h in ["# ax eval report", "## summary", "## guardrail", "## ratios vs A", "## adoption",
+    for h in ["# ax eval report", "## summary", "## guardrail", "## ratios vs baseline", "## adoption",
               "## wins and losses", "## verdict", "## limitations"]:
         assert h in md, h
     assert "codex 0.156.0" in md and "gpt-6-astra, effort medium" in md and "abc1234" in md
@@ -114,7 +114,7 @@ def test_report_renders(fake):
     assert "26 total, 24 usable, 1 infra failures, 1 incomplete" in md
     assert "| A | 8 | 4 | 50.0% |" in md and "| B | 8 | 4 | 75.0% |" in md
     assert "| B/A | tokens | 0.70x |" in md and "| C/A | tokens | 1.00x |" in md
-    assert "| B | 8 | 8 (100.0%) | 25.0% | 8 |" in md
+    assert "| B | 8 | 8 (100.0%) | 25.0% | 0 | 8 |" in md
     assert "tool-surface confound" in md and "single repo" in md and "single agent and model" in md
     assert "[A1](../runs/hono-3-A-1/events.jsonl)" in md and "[B2](../runs/hono-3-B-2/events.jsonl)" in md
     verdict = md.split("## verdict")[1].split("## limitations")[0]

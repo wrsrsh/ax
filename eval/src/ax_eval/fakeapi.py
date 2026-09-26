@@ -43,13 +43,21 @@ class Script:
 _ids = itertools.count(1)
 
 
-def item_for(step: str) -> dict:
+def item_for(step: str, code_mode: bool = True) -> dict:
+    """one output item per step. in code mode every tool call is javascript inside
+    `exec`; with code mode off (setups Ar/Br/Cr) exec_command is a function tool and
+    apply_patch a freeform custom tool."""
     kind, _, arg = step.partition(":")
     n = next(_ids)
     if kind == "patch":
         patch = arg.replace("\\n", "\n")
+        if not code_mode:
+            return {"type": "custom_tool_call", "id": f"ctc_{n}", "call_id": f"call_{n}", "name": "apply_patch", "input": patch, "status": "completed"}
         js = f"text(await tools.apply_patch({json.dumps(patch)}));"
     elif kind == "sh":
+        if not code_mode:
+            return {"type": "function_call", "id": f"fc_{n}", "call_id": f"call_{n}", "name": "exec_command",
+                    "arguments": json.dumps({"cmd": arg}), "status": "completed"}
         js = f"const r = await tools.exec_command({{cmd: {json.dumps(arg)}}});\ntext(r.output ?? JSON.stringify(r));"
     else:
         return {
@@ -62,8 +70,13 @@ def item_for(step: str) -> dict:
     return {"type": "custom_tool_call", "id": f"ctc_{n}", "call_id": f"call_{n}", "name": "exec", "input": js, "status": "completed"}
 
 
-def sse(script: Script) -> bytes:
-    item = item_for(script.next())
+def offers_exec(body: dict) -> bool:
+    return any(t.get("name") == "exec" for item in body.get("input", []) if item.get("type") == "additional_tools"
+               for ns in item.get("tools", []) for t in ns.get("tools", []))
+
+
+def sse(script: Script, code_mode: bool = True) -> bytes:
+    item = item_for(script.next(), code_mode)
     u = script.usage
     rid = f"resp_{next(_ids)}"
     base = {"id": rid, "object": "response", "model": "gpt-6-astra"}
@@ -91,14 +104,15 @@ def handler(script: Script) -> type:
     class H(http.server.BaseHTTPRequestHandler):
         def do_POST(self):
             body = self.rfile.read(int(self.headers.get("content-length", 0)))
+            req = json.loads(body or b"{}")
             if script.record:
                 with open(script.record, "a") as f:
-                    f.write(json.dumps({"path": self.path, "body": json.loads(body or b"{}")}) + "\n")
+                    f.write(json.dumps({"path": self.path, "body": req}) + "\n")
             if not self.path.rstrip("/").endswith("/responses"):
                 self.send_response(404)
                 self.end_headers()
                 return
-            payload = sse(script)
+            payload = sse(script, offers_exec(req))
             self.send_response(200)
             self.send_header("content-type", "text/event-stream")
             self.send_header("content-length", str(len(payload)))

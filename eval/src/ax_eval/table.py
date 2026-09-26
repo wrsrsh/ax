@@ -26,7 +26,7 @@ MANIFEST = [
 GRADE = ["resolved", "f2p_passed", "f2p_total", "p2p_passed", "p2p_total", "grade_seconds"]
 METRICS = [
     "input_tokens", "cached_input_tokens", "uncached_input_tokens", "output_tokens", "reasoning_tokens",
-    "tool_calls", "failed_commands", "failed_patches", "fallback_rate", "ax_rejections", "cost", "completed",
+    "tool_calls", "failed_commands", "failed_patches", "fallback_rate", "script_calls", "ax_rejections", "cost", "completed",
 ]
 DICTS = ["tools", "ax_calls", "ax_outcomes"]
 COLUMNS = MANIFEST + ["split"] + GRADE + ["grade_error", "failing"] + METRICS + [

@@ -18,7 +18,7 @@ from pathlib import Path
 
 import numpy as np
 
-from ax_eval.setups import SETUPS
+from ax_eval.setups import SETUPS, base_of
 from ax_eval.util import RUNS, jsonl
 
 METRICS = ("tokens", "cost", "turns", "wall_seconds")
@@ -191,7 +191,8 @@ def wins_losses(rows, metric, a, b, n=5, higher_is_better=None) -> dict:
 def summary(rows, n_boot=N_BOOT, seed=SEED) -> dict:
     kept = clean(rows)
     present = [s for s in SETUPS if any(r.get("setup") == s for r in kept)]
-    pairs = [(a, b) for i, a in enumerate(present) for b in present[i + 1:]]
+    # within a family (A/B/C, Ar/Br/Cr) every pair; across families only the same letter (A vs Ar)
+    pairs = [(a, b) for i, a in enumerate(present) for b in present[i + 1:] if base_of(a) == base_of(b) or a[0] == b[0]]
     tasks = {s: len({r["task_id"] for r in kept if r.get("setup") == s}) for s in present}
     return {
         "n_rows": len(rows),
@@ -203,6 +204,7 @@ def summary(rows, n_boot=N_BOOT, seed=SEED) -> dict:
         "pass_rate_diff": {f"{b}-{a}": dict(zip(("diff", "lo", "hi"), pass_rate_diff(kept, a, b, n_boot, seed)))
                            for a, b in pairs},
         "guardrail": guardrail(kept, n_boot=n_boot, seed=seed) if {"A", "B"} <= set(present) else None,
+        "guardrail_raw": guardrail(kept, "Ar", "Br", n_boot=n_boot, seed=seed) if {"Ar", "Br"} <= set(present) else None,
         "ratios": {m: {f"{b}/{a}": ratio_report(kept, m, b, a, n_boot, seed) for a, b in pairs} for m in METRICS},
         "adoption": {s: adoption(kept, s) for s in present},
         "wins_losses": {m: {f"{b} vs {a}": wins_losses(kept, m, a, b) for a, b in pairs}

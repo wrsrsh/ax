@@ -37,7 +37,7 @@ from ax_eval.fakeapi import Script, serve
 from ax_eval.grade import grade, patch_paths
 from ax_eval.images import agent_image
 from ax_eval.parse import metrics, parse_events
-from ax_eval.setups import SETUPS, agents_md, codex_args, uses_ax, write_codex_home
+from ax_eval.setups import CORE, SETUPS, agents_md, codex_args, uses_ax, write_codex_home
 from ax_eval.util import EVAL, RUNS, TASKS, jsonl, sh
 
 LEDGER = RUNS / "ledger.jsonl"
@@ -438,7 +438,7 @@ def with_fake_api(run_fn=run_one):
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--tasks", nargs="+", default=["dev"], help="dev, heldout, all, or task ids")
-    p.add_argument("--setups", nargs="+", default=list(SETUPS), choices=SETUPS)
+    p.add_argument("--setups", nargs="+", default=list(CORE), choices=SETUPS, help="A B C, plus Ar Br Cr with code mode off")
     p.add_argument("--repeats", type=int, default=1)
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--agent", choices=("stub", "codex"), default="stub")

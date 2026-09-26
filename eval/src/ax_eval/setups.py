@@ -1,8 +1,13 @@
-"""the three setups every task runs under, and the codex config for each.
+"""the setups a task can run under, and the codex config for each.
 
 A: stock codex + a placebo AGENTS note of the same token length as B's.
 B: stock codex + the ax note, ax on PATH.
 C: B without apply_patch (the model catalog loses `apply_patch_tool_type`).
+
+Ar / Br / Cr: the same three with codex's code mode off. stock codex 0.156.0
+gives gpt-6-astra one `exec` javascript tool and nests exec_command /
+apply_patch inside it (`tool_mode = "code_mode_only"` in the catalog); dropping
+that key gives the model plain function tools again. no feature flag does it.
 
 config.toml never holds a secret: the provider reads its key from `env_key`
 at run time.
@@ -17,7 +22,9 @@ from pathlib import Path
 
 from ax_eval.util import EVAL
 
-SETUPS = ("A", "B", "C")
+CORE = ("A", "B", "C")
+RAW = ("Ar", "Br", "Cr")
+SETUPS = CORE + RAW
 NOTES = EVAL / "setups"
 DISABLED = ("goals", "multi_agent", "apps", "browser_use", "computer_use", "image_generation", "in_app_browser", "plugins", "hooks")
 CATALOG_NAME = "model-catalog.json"
@@ -30,7 +37,16 @@ def _check(setup: str) -> str:
 
 
 def uses_ax(setup: str) -> bool:
-    return _check(setup) != "A"
+    return _check(setup)[0] != "A"
+
+
+def raw_tools(setup: str) -> bool:
+    return _check(setup).endswith("r")
+
+
+def base_of(setup: str) -> str:
+    """the no-ax setup this one is compared against: A, or Ar for the raw family."""
+    return "Ar" if raw_tools(setup) else "A"
 
 
 def agents_md(setup: str) -> str:
@@ -64,14 +80,21 @@ def provider_toml(
     )
 
 
-def catalog_without_apply_patch(src: Path, dst: Path, model: str = "gpt-6-astra") -> Path:
-    """setup C: the same catalog minus apply_patch for `model`."""
+def catalog_for(setup: str, src: Path, dst: Path, model: str = "gpt-6-astra") -> Path:
+    """the source catalog with the keys this setup takes away from `model`:
+    apply_patch_tool_type for C/Cr, tool_mode (code mode) for Ar/Br/Cr."""
+    drop = set()
+    if _check(setup)[0] == "C":
+        drop.add("apply_patch_tool_type")
+    if raw_tools(setup):
+        drop.add("tool_mode")
     data = json.loads(Path(src).read_text())
 
     def strip(x):
         if isinstance(x, dict):
             if (x.get("slug") or x.get("id")) == model:
-                x.pop("apply_patch_tool_type", None)
+                for k in drop:
+                    x.pop(k, None)
             for v in x.values():
                 strip(v)
         elif isinstance(x, list):
@@ -81,6 +104,10 @@ def catalog_without_apply_patch(src: Path, dst: Path, model: str = "gpt-6-astra"
     strip(data)
     Path(dst).write_text(json.dumps(data))
     return Path(dst)
+
+
+def catalog_without_apply_patch(src: Path, dst: Path, model: str = "gpt-6-astra") -> Path:
+    return catalog_for("C", src, dst, model)
 
 
 def write_codex_home(
@@ -97,10 +124,7 @@ def write_codex_home(
     dest = Path(dest)
     dest.mkdir(parents=True, exist_ok=True)
     catalog = dest / CATALOG_NAME
-    if setup == "C":
-        catalog_without_apply_patch(catalog_src, catalog, model)
-    else:
-        shutil.copyfile(catalog_src, catalog)
+    catalog_for(setup, catalog_src, catalog, model)
     (dest / "config.toml").write_text(
         f"model = {_s(model)}\n"
         f"model_provider = {_s(provider)}\n"

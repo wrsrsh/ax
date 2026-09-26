@@ -18,6 +18,16 @@ def test_unwrap_and_kinds():
     assert kinds("ax --json grep foo") == ["ax grep"]
 
 
+def test_scripts_count_as_file_ops():
+    assert kinds("python3 -c 'print(open(\"a\").read())'") == ["script python3"]
+    assert kinds("bash -lc \"python3 - <<'EOF'\nimport re\nEOF\"") == ["script python3"]
+    assert kinds("node -e 'console.log(1)' && cat a") == ["script node", "cat"]
+    assert kinds("python3 scripts/check.py") == ["python3"]
+    assert kinds("node dist/index.js") == ["node"]
+    assert fallback_rate({"script python3": 2, "ax read": 2}) == 0.5
+    assert fallback_rate({"python3": 3}) is None
+
+
 def test_shell_fixture():
     r = parse_events(lines("shell_and_message.jsonl"))
     assert r["completed"] and r["error"] is None
@@ -68,6 +78,7 @@ def test_ax_log_and_metrics(tmp_path):
     assert parse_ax_log(log.read_text().splitlines()) == {"ax_calls": {"read": 1, "edit": 2}, "ax_outcomes": {"stale": 1, "ok": 1}}
     m = metrics(FX / "ax_calls.jsonl", log, {"input": 2.0, "cached_input": 0.5, "output": 8.0})
     assert m["ax_rejections"] == 1
+    assert m["script_calls"] == 0
     assert abs(m["cost"] - (800 * 2.0 + 4000 * 0.5 + 160 * 8.0) / 1e6) < 1e-12
 
 

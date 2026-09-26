@@ -14,8 +14,11 @@ import shlex
 from collections import Counter
 from pathlib import Path
 
-# commands that read, search or edit files; anything else (tests, git, npm) isn't a file op
-FILE_OPS = {"ax", "cat", "head", "tail", "sed", "awk", "grep", "rg", "find", "ls", "nl", "wc", "apply_patch"}
+# commands that read, search or edit files; anything else (tests, git, npm) isn't a file op.
+# `script` is an interpreter running inline code (python -c, node -e, a heredoc):
+# the model doing the file work in python instead of any tool.
+FILE_OPS = {"ax", "cat", "head", "tail", "sed", "awk", "grep", "rg", "find", "ls", "nl", "wc", "apply_patch", "script"}
+INTERPRETERS = {"python", "python3", "node", "bun", "deno", "perl", "ruby"}
 
 
 def unwrap(command: str) -> str:
@@ -33,7 +36,11 @@ def unwrap(command: str) -> str:
 def kinds(command: str) -> list[str]:
     """every program in a shell line, `ax` tagged with its subcommand."""
     out = []
-    for seg in re.split(r"\|\||&&|;|\||\n", unwrap(command)):
+    cmd = unwrap(command)
+    if "<<" in cmd:
+        # a heredoc body isn't more commands
+        cmd = cmd.split("\n", 1)[0]
+    for seg in re.split(r"\|\||&&|;|\||\n", cmd):
         words = seg.strip().split()
         while words and ("=" in words[0] or words[0] in {"sudo", "env", "time", "timeout", "xargs"}):
             words = words[1:]
@@ -45,6 +52,8 @@ def kinds(command: str) -> list[str]:
         if prog == "ax":
             sub = next((w for w in words[1:] if not w.startswith("-")), "")
             out.append(f"ax {sub}".strip())
+        elif prog in INTERPRETERS and (set(words[1:]) & {"-c", "-e", "-"} or "<<" in seg):
+            out.append(f"script {prog}")
         else:
             out.append(prog)
     return out
@@ -130,6 +139,7 @@ def metrics(events: Path, ax_log: Path | None = None, prices: dict | None = None
     row = parse_events(events.read_text().splitlines() if events.exists() else [])
     row.update(parse_ax_log(ax_log.read_text().splitlines() if ax_log and ax_log.exists() else []))
     row["fallback_rate"] = fallback_rate(row["tools"])
+    row["script_calls"] = sum(v for k, v in row["tools"].items() if k.startswith("script"))
     row["ax_rejections"] = sum(row["ax_outcomes"].get(k, 0) for k in ("stale", "ambiguous", "parse-rejected", "no-match"))
     if prices:
         row["cost"] = cost(row, prices)

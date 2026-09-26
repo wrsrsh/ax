@@ -5,7 +5,7 @@ import tomllib
 import pytest
 
 from ax_eval import setups
-from ax_eval.setups import SETUPS, agents_md, codex_args, provider_toml, uses_ax, write_codex_home
+from ax_eval.setups import SETUPS, agents_md, base_of, codex_args, provider_toml, raw_tools, uses_ax, write_codex_home
 
 MODEL = "gpt-6-astra"
 
@@ -14,8 +14,8 @@ MODEL = "gpt-6-astra"
 def catalog(tmp_path):
     p = tmp_path / "src-catalog.json"
     p.write_text(json.dumps({"models": [
-        {"slug": MODEL, "apply_patch_tool_type": "freeform", "x": 1},
-        {"slug": "other", "apply_patch_tool_type": "freeform"},
+        {"slug": MODEL, "apply_patch_tool_type": "freeform", "tool_mode": "code_mode_only", "x": 1},
+        {"slug": "other", "apply_patch_tool_type": "freeform", "tool_mode": "code_mode_only"},
     ]}))
     return p
 
@@ -48,7 +48,9 @@ def test_config_per_setup(tmp_path, catalog, setup, monkeypatch):
         "request_max_retries": 0,
         "stream_max_retries": 0,
     }
-    assert ("apply_patch_tool_type" in ms[MODEL]) == (setup != "C")
+    assert ("apply_patch_tool_type" in ms[MODEL]) == (setup[0] != "C")
+    assert ("tool_mode" in ms[MODEL]) == (not setup.endswith("r"))
+    assert "tool_mode" in ms["other"]
     assert ms[MODEL]["x"] == 1 and "apply_patch_tool_type" in ms["other"]
 
 
@@ -67,7 +69,9 @@ def test_provider_toml():
 
 
 def test_setup_flags():
-    assert [uses_ax(s) for s in SETUPS] == [False, True, True]
+    assert [uses_ax(s) for s in SETUPS] == [False, True, True, False, True, True]
+    assert [raw_tools(s) for s in SETUPS] == [False, False, False, True, True, True]
+    assert [base_of(s) for s in SETUPS] == ["A", "A", "A", "Ar", "Ar", "Ar"]
     with pytest.raises(ValueError):
         uses_ax("D")
     assert agents_md("B") == agents_md("C") != agents_md("A")
