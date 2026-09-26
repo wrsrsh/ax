@@ -17,3 +17,6 @@ build-backend = "uv_build"
 dev = [
     "pytest>=9.1.1",
 ]
+
+[tool.pytest.ini_options]
+markers = ["docker: needs docker and locally built task images (runs at $0)"]
