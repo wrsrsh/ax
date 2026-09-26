@@ -6,7 +6,7 @@ import pytest
 
 from ax_eval import images
 from ax_eval.images import CODEX_VERSION, agent_tag, dockerfile, parse_labels
-from ax_eval.parity import ROOT
+from ax_eval.util import ROOT
 
 
 def test_agent_tag():
@@ -40,8 +40,7 @@ def test_dockerfile():
 def _image():
     if not shutil.which("docker") or not shutil.which("musl-gcc"):
         return None
-    have = lambda img: subprocess.run(["docker", "image", "inspect", img], capture_output=True).returncode == 0  # noqa: E731
-    return next((i for i in images.final_images() if have(i)), None)
+    return next((i for i in images.final_images() if images.image_labels(i) is not None), None)
 
 
 @pytest.mark.docker

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 
@@ -9,6 +10,7 @@ EVAL = Path(__file__).resolve().parents[2]
 ROOT = EVAL.parent
 TASKS = EVAL / "tasks"
 REPORT = EVAL / "report"
+RUNS = EVAL / "runs"
 
 
 def sh(*cmd: str, check: bool = True, **kw) -> subprocess.CompletedProcess[str]:
@@ -17,3 +19,7 @@ def sh(*cmd: str, check: bool = True, **kw) -> subprocess.CompletedProcess[str]:
 
 def git(d: Path, *args: str) -> str:
     return sh("git", *args, cwd=d).stdout
+
+
+def jsonl(path: Path) -> list[dict]:
+    return [json.loads(line) for line in Path(path).read_text().splitlines() if line.strip()]

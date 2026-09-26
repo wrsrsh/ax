@@ -11,9 +11,7 @@ import tempfile
 from pathlib import Path
 
 from ax_eval.fakeapi import Script, serve
-from ax_eval.setups import catalog_without_apply_patch, codex_args, write_codex_home
-
-__all__ = ["run", "nested_tools", "catalog_without_apply_patch"]
+from ax_eval.setups import codex_args, write_codex_home
 
 
 def _clean_env() -> dict[str, str]:

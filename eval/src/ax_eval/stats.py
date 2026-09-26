@@ -18,12 +18,13 @@ from pathlib import Path
 
 import numpy as np
 
-SETUPS = ("A", "B", "C")
+from ax_eval.setups import SETUPS
+from ax_eval.util import RUNS, jsonl
+
 METRICS = ("tokens", "cost", "turns", "wall_seconds")
 N_BOOT = 10_000
 SEED = 0
 REJECTS = ("stale", "ambiguous", "parse-rejected", "no-match")
-RUNS = Path(__file__).resolve().parents[2] / "runs" / "runs.jsonl"
 
 
 def clean(rows: list[dict]) -> list[dict]:
@@ -192,7 +193,7 @@ def summary(rows, n_boot=N_BOOT, seed=SEED) -> dict:
     present = [s for s in SETUPS if any(r.get("setup") == s for r in kept)]
     pairs = [(a, b) for i, a in enumerate(present) for b in present[i + 1:]]
     tasks = {s: len({r["task_id"] for r in kept if r.get("setup") == s}) for s in present}
-    out = {
+    return {
         "n_rows": len(rows),
         "n_infra_excluded": len(rows) - len(kept),
         "seed": seed,
@@ -207,23 +208,18 @@ def summary(rows, n_boot=N_BOOT, seed=SEED) -> dict:
         "wins_losses": {m: {f"{b} vs {a}": wins_losses(kept, m, a, b) for a, b in pairs}
                         for m in ("resolved",) + METRICS},
     }
-    return out
-
-
-def load(path: Path) -> list[dict]:
-    return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
 
 
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description="summary stats over runs.jsonl")
-    p.add_argument("runs", nargs="?", type=Path, default=RUNS)
+    p.add_argument("runs", nargs="?", type=Path, default=RUNS / "runs.jsonl")
     p.add_argument("--seed", type=int, default=SEED)
     p.add_argument("--boot", type=int, default=N_BOOT)
     a = p.parse_args(argv)
     if not a.runs.exists():
         print(f"no runs file at {a.runs}", file=sys.stderr)
         return 1
-    print(json.dumps(summary(load(a.runs), a.boot, a.seed), indent=2))
+    print(json.dumps(summary(jsonl(a.runs), a.boot, a.seed), indent=2))
     return 0
 
 

@@ -17,11 +17,7 @@ from datetime import datetime
 from pathlib import Path
 from statistics import mean
 
-from ax_eval.mine import TASKS
-from ax_eval.parity import EVAL
-
-RUNS = EVAL / "runs"
-REPORT = EVAL / "report"
+from ax_eval.util import RUNS, TASKS, jsonl
 
 MANIFEST = [
     "run_id", "task_id", "setup", "rep", "seed", "agent", "codex_version", "model", "effort",
@@ -61,20 +57,14 @@ def _time(v) -> float | None:
 
 def splits(tasks: Path = TASKS / "final.jsonl") -> dict[str, str]:
     """task id -> "dev" / "heldout"."""
-    if not tasks.exists():
-        return {}
-    out = {}
-    for line in tasks.read_text().splitlines():
-        if line.strip():
-            t = json.loads(line)
-            out[t["id"]] = t.get("set")
-    return out
+    return {t["id"]: t.get("set") for t in jsonl(tasks)} if tasks.exists() else {}
 
 
 def row(run: Path, split: dict[str, str] | None = None) -> dict:
     m, g, x = (_load(run / f) for f in ("manifest.json", "grade.json", "metrics.json"))
     missing = [f for f, d in (("manifest.json", m), ("grade.json", g), ("metrics.json", x)) if d is None]
-    missing += [f for f in ("events.jsonl",) if not (run / f).exists()]
+    if not (run / "events.jsonl").exists():
+        missing.append("events.jsonl")
     m, g, x = m or {}, g or {}, x or {}
 
     r = {k: m.get(k) for k in MANIFEST}
@@ -155,7 +145,7 @@ def collect(runs_dir: Path = RUNS, report_dir: Path | None = None, tasks: Path =
 
 def load(runs_dir: Path = RUNS) -> list[dict]:
     f = Path(runs_dir) / "runs.jsonl"
-    return [json.loads(line) for line in f.read_text().splitlines() if line.strip()] if f.exists() else []
+    return jsonl(f) if f.exists() else []
 
 
 def main(argv: list[str] | None = None) -> int:

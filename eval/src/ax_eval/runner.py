@@ -30,19 +30,16 @@ import sys
 import tempfile
 import threading
 import time
-from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
+from ax_eval.fakeapi import Script, serve
 from ax_eval.grade import grade, patch_paths
-from ax_eval.mine import TASKS
-from ax_eval.parity import EVAL
-from ax_eval.parse import metrics, parse_events
-
 from ax_eval.images import agent_image
+from ax_eval.parse import metrics, parse_events
 from ax_eval.setups import SETUPS, agents_md, codex_args, uses_ax, write_codex_home
+from ax_eval.util import EVAL, RUNS, TASKS, jsonl, sh
 
-RUNS = EVAL / "runs"
 LEDGER = RUNS / "ledger.jsonl"
 PRICES = EVAL / "prices.json"
 SCRIPTS = EVAL / "scripts"
@@ -58,6 +55,8 @@ API_TROUBLE = re.compile(
     r"\b(429|500|502|503|504)\b|rate.?limit|service unavailable|overloaded|unauthorized|\b401\b",
     re.I,
 )
+REAP = 'for p in /proc/[0-9]*; do n=${p#/proc/}; [ "$n" -gt 1 ] && [ "$n" != $$ ] && kill -%s "$n" 2>/dev/null; done; true'
+KILL_TIMEOUT = 'for p in /proc/[0-9]*; do [ "$(cat $p/comm 2>/dev/null)" = timeout ] && kill -TERM ${p#/proc/}; done; true'
 
 
 class BudgetExceeded(RuntimeError):
@@ -74,7 +73,7 @@ def new_run_id(task_id: str, setup: str, rep: int) -> str:
 
 def load_tasks(sel: list[str], path: Path = TASKS / "final.jsonl") -> list[dict]:
     """`dev`, `heldout`, `all` or task ids."""
-    tasks = [json.loads(l) for l in path.open()]
+    tasks = jsonl(path)
     out = [t for t in tasks if "all" in sel or t["set"] in sel or t["id"] in sel]
     missing = set(sel) - {"all", "dev", "heldout"} - {t["id"] for t in tasks}
     if missing:
@@ -91,7 +90,7 @@ def plan(tasks: list, setups: list[str], repeats: int, seed: int) -> list[tuple[
 
 
 def load_prices(path: Path = PRICES) -> dict:
-    """$ per 1M tokens (input, cached_input, cache_write, output) from eval/prices.json; zeros and a warning without it."""
+    """$ per 1M tokens from prices.json; zeros (and a warning) without it."""
     keys = ("input", "cached_input", "cache_write", "output")
     if not path.exists():
         print(f"warning: no {path.name}, costs will be 0", file=sys.stderr)
@@ -101,7 +100,7 @@ def load_prices(path: Path = PRICES) -> dict:
 
 
 def read_ledger(path: Path) -> list[dict]:
-    return [json.loads(l) for l in path.open() if l.strip()] if path.exists() else []
+    return jsonl(path) if path.exists() else []
 
 
 def spent(rows: list[dict]) -> float:
@@ -148,12 +147,8 @@ def infra_reason(exit_code: int | None, timed_out: bool, events: list[str], stde
     return None
 
 
-def docker(*args: str, check: bool = True, **kw) -> subprocess.CompletedProcess:
-    return subprocess.run(["docker", *args], capture_output=True, text=True, check=check, **kw)
-
-
-REAP = 'for p in /proc/[0-9]*; do n=${p#/proc/}; [ "$n" -gt 1 ] && [ "$n" != $$ ] && kill -%s "$n" 2>/dev/null; done; true'
-KILL_TIMEOUT = 'for p in /proc/[0-9]*; do [ "$(cat $p/comm 2>/dev/null)" = timeout ] && kill -TERM ${p#/proc/}; done; true'
+def docker(*args: str, **kw) -> subprocess.CompletedProcess[str]:
+    return sh("docker", *args, **kw)
 
 
 def stage_home(stage: Path, setup: str, base_url: str, env_key: str, catalog_src: Path, model: str, effort: str) -> Path:
@@ -265,14 +260,17 @@ def run_one(
         why = infra_reason(m["exit_code"], m["timed_out"], events, (out_dir / "stderr.log").read_text())
         if why:
             m["infra_failure"], m["infra_reason"] = True, why
-    except Exception as e:  # noqa: BLE001 - any failure here is the harness's, not the agent's
+    except Exception as e:  # any failure here is the harness's, not the agent's
         m["infra_failure"], m["infra_reason"] = True, f"{phase}: {describe(e)}"
     finally:
         docker("exec", name, "chown", "-R", f"{os.getuid()}:{os.getgid()}", "/out", check=False)
         docker("rm", "-f", name, check=False)
         shutil.rmtree(stage, ignore_errors=True)
         log = box / "ax_log.jsonl"
-        shutil.move(log, out_dir / "ax_log.jsonl") if log.exists() else (out_dir / "ax_log.jsonl").touch()
+        if log.exists():
+            shutil.move(log, out_dir / "ax_log.jsonl")
+        else:
+            (out_dir / "ax_log.jsonl").touch()
         shutil.rmtree(box, ignore_errors=True)
 
     if not m["infra_failure"]:
@@ -280,7 +278,7 @@ def run_one(
             g = grade(task, (out_dir / "final.diff").read_text())
             (out_dir / "grade.json").write_text(json.dumps(g, indent=1) + "\n")
             m["resolved"] = g["resolved"]
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             m["infra_failure"], m["infra_reason"] = True, f"grade: {describe(e)}"
     mt = metrics(out_dir / "events.jsonl", out_dir / "ax_log.jsonl", prices or load_prices())
     (out_dir / "metrics.json").write_text(json.dumps(mt, indent=1) + "\n")
@@ -387,7 +385,7 @@ def run_batch(
                     write_manifest(runs_dir / prev["run_id"], prev)
             try:
                 m = run_fn(by_id[task_id], setup, run_id, out, seed=seed, **kw)
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 out.mkdir(parents=True, exist_ok=True)
                 m = {"run_id": run_id, "task": task_id, "setup": setup, "seed": seed, "agent": kw.get("agent"),
                      "infra_failure": True, "infra_reason": f"runner: {describe(e)}", "cost": 0.0, "started": now(), "ended": now()}
@@ -425,7 +423,6 @@ def fake_steps(task: dict, setup: str) -> list[str]:
 def with_fake_api(run_fn=run_one):
     """a run_fn that points codex at a fresh fake api per run (bound to the
     docker bridge, reached as host.docker.internal via host-gateway)."""
-    from ax_eval.fakeapi import Script, serve
 
     def fn(task: dict, setup: str, run_id: str, out_dir: Path, **kw) -> dict:
         srv, port = serve(Script(fake_steps(task, setup)), host=bridge_ip())

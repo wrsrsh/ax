@@ -15,8 +15,10 @@ import re
 import shutil
 from pathlib import Path
 
+from ax_eval.util import EVAL
+
 SETUPS = ("A", "B", "C")
-NOTES = Path(__file__).resolve().parents[2] / "setups"
+NOTES = EVAL / "setups"
 DISABLED = ("goals", "multi_agent", "apps", "browser_use", "computer_use", "image_generation", "in_app_browser", "plugins", "hooks")
 CATALOG_NAME = "model-catalog.json"
 

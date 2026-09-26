@@ -5,6 +5,7 @@ import subprocess
 import pytest
 
 from ax_eval import runner
+from ax_eval.images import image_labels
 from ax_eval.runner import Budget, BudgetExceeded, est_from_ledger, infra_reason, load_prices, plan, read_ledger, run_batch, spent
 
 TASKS = [{"id": f"t{i}"} for i in range(3)]
@@ -152,13 +153,10 @@ def test_cli_plan_only(capsys):
     assert len(lines) == 10 * 2 * 2
 
 
-# --- docker: real containers, $0 ---
-
 def _dev_task():
     if not shutil.which("docker"):
         return None
-    have = lambda img: subprocess.run(["docker", "image", "inspect", img], capture_output=True).returncode == 0  # noqa: E731
-    return next((t for t in runner.load_tasks(["dev"]) if have(t["image"])), None)
+    return next((t for t in runner.load_tasks(["dev"]) if image_labels(t["image"]) is not None), None)
 
 
 DEV = _dev_task()

@@ -26,21 +26,15 @@ import argparse
 import hashlib
 import json
 import shutil
-import subprocess
 import sys
 import tempfile
 import time
 from pathlib import Path
 
-from ax_eval.mine import TASKS
-from ax_eval.parity import ROOT
+from ax_eval.util import ROOT, TASKS, jsonl, sh
 
 CODEX_VERSION = "0.156.0"  # matches `codex --version` on the host
 MUSL = "x86_64-unknown-linux-musl"
-
-
-def sh(*cmd: str, check: bool = True, **kw) -> subprocess.CompletedProcess:
-    return subprocess.run(list(cmd), capture_output=True, text=True, check=check, **kw)
 
 
 def agent_tag(task_image: str, with_ax: bool) -> str:
@@ -57,7 +51,7 @@ def parse_labels(inspect_out: str) -> dict[str, str]:
 
 
 def image_labels(tag: str) -> dict[str, str] | None:
-    """labels of a local image, None if it doesn't exist."""
+    """None if the image isn't there."""
     r = sh("docker", "image", "inspect", "-f", "{{json .Config.Labels}}", tag, check=False)
     return parse_labels(r.stdout) if r.returncode == 0 else None
 
@@ -120,18 +114,16 @@ def agent_image(task_image: str, with_ax: bool, ax_bin: Path | None = None) -> s
     have = image_labels(tag)
     if have is not None and (not with_ax or ax_bin is None):
         return tag
-    if with_ax and ax_bin is None:
-        ax_bin = build_ax_static(ROOT)
     labels = {"org.ax.task-image": task_image, "org.ax.codex": CODEX_VERSION}
     if with_ax:
-        assert ax_bin is not None
+        if ax_bin is None:
+            ax_bin = build_ax_static(ROOT)
         labels |= {"org.ax.commit": _bin_commit(ax_bin), "org.ax.sha256": sha256(ax_bin)}
         if have is not None and have.get("org.ax.sha256") == labels["org.ax.sha256"]:
             return tag
     with tempfile.TemporaryDirectory() as ctx:
         Path(ctx, "Dockerfile").write_text(dockerfile(task_image, with_ax, labels))
         if with_ax:
-            assert ax_bin is not None
             shutil.copy2(ax_bin, Path(ctx, "ax"))
         r = sh("docker", "build", "-q", "-t", tag, ctx, check=False)
         if r.returncode:
@@ -140,7 +132,7 @@ def agent_image(task_image: str, with_ax: bool, ax_bin: Path | None = None) -> s
 
 
 def final_images() -> list[str]:
-    return sorted({json.loads(l)["image"] for l in open(TASKS / "final.jsonl")})
+    return sorted({t["image"] for t in jsonl(TASKS / "final.jsonl")})
 
 
 def main(argv: list[str] | None = None) -> int:

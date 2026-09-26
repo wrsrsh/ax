@@ -44,7 +44,7 @@ def write_run(root, run_id, task, setup, rep, *, resolved=True, scale=1.0, grade
 
 @pytest.fixture
 def fake(tmp_path, monkeypatch):
-    # keep the real stats module (if merged) out of it: these tests pin the fallback
+    # these tests pin the built-in fallback, not ax_eval.stats
     monkeypatch.setattr(report, "summary", lambda rows: (fallback_summary(rows), "built-in fallback"))
     runs = tmp_path / "runs"
     for setup, (scale, solved) in PLAN.items():

@@ -4,7 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from ax_eval.capture import catalog_without_apply_patch, nested_tools, run
+from ax_eval.capture import nested_tools, run
+from ax_eval.setups import catalog_without_apply_patch
 
 CATALOG = Path.home() / ".codex/model-catalogs/azure-foundry.json"
 

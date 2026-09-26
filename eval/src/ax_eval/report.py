@@ -3,16 +3,14 @@
     uv run python -m ax_eval.report                # re-collect runs, then render
     uv run python -m ax_eval.report --no-collect   # render the existing runs.jsonl
 
-numbers come from ax_eval.stats.summary when it's there and its output has the
-expected shape; anything missing falls back to the small versions below
-(wilson CIs for pass rates, bootstrap over tasks for paired ratios). the
-footer says which one was used.
+numbers come from ax_eval.stats.summary. the small versions below (wilson CIs
+for pass rates, bootstrap over tasks for paired ratios) fill in the counts it
+doesn't report, and stand in if it fails. the footer says which one was used.
 """
 
 from __future__ import annotations
 
 import argparse
-import json
 import math
 import os
 import random
@@ -21,8 +19,9 @@ from datetime import date
 from pathlib import Path
 from statistics import mean, median
 
-from ax_eval.mine import TASKS
-from ax_eval.table import REPORT, RUNS, collect, load, usable
+from ax_eval import stats
+from ax_eval.table import collect, load, splits, usable
+from ax_eval.util import REPORT, RUNS, TASKS
 
 METRICS = ["tokens", "cost", "turns", "wall_seconds"]
 BASE = "A"
@@ -48,8 +47,6 @@ LIMITATIONS = [
     ),
 ]
 
-
-# ---- fallback stats ----
 
 def wilson(k: int, n: int, z: float = 1.96) -> list[float] | None:
     if not n:
@@ -117,24 +114,6 @@ def fallback_summary(rows: list[dict]) -> dict:
     return out
 
 
-def _ok_setups(v) -> bool:
-    return isinstance(v, dict) and all(isinstance(d, dict) and "pass_rate" in d and "ci" in d for d in v.values())
-
-
-def _ok_ratios(v) -> bool:
-    return isinstance(v, dict) and all(
-        isinstance(d, dict) and all(isinstance(e, dict) and "median" in e and "ci" in e for e in d.values())
-        for d in v.values()
-    )
-
-
-def _ok_adoption(v) -> bool:
-    return isinstance(v, dict) and all(isinstance(d, dict) and "adoption" in d for d in v.values())
-
-
-CHECKS = {"setups": _ok_setups, "guardrail": lambda v: v is not None, "ratios": _ok_ratios, "adoption": _ok_adoption}
-
-
 def from_stats(real: dict, fb: dict) -> dict:
     """reshape ax_eval.stats.summary output into the sections the renderer reads."""
     out = {}
@@ -167,34 +146,17 @@ def from_stats(real: dict, fb: dict) -> dict:
 def summary(rows: list[dict]) -> tuple[dict, str]:
     fb = fallback_summary(rows)
     try:
-        from ax_eval import stats
-    except ImportError:
-        return fb, "built-in fallback (ax_eval.stats not installed)"
-    try:
-        real = from_stats(stats.summary(rows), fb)
-    except Exception as e:  # noqa: BLE001 - a broken stats module shouldn't block the report
+        return from_stats(stats.summary(rows), fb), "ax_eval.stats.summary"
+    except Exception as e:  # a stats bug shouldn't block the report
         return fb, f"built-in fallback (ax_eval.stats.summary failed: {e!r})"
-    out, fell = dict(fb), []
-    for key, check in CHECKS.items():
-        v = real.get(key)
-        if check(v):
-            out[key] = v
-        else:
-            fell.append(key)
-    src = "ax_eval.stats.summary"
-    return out, src + (f"; built-in fallback for {', '.join(fell)}" if fell else "")
 
-
-# ---- formatting ----
 
 def pct(v) -> str:
     return "-" if v is None else f"{100 * v:.1f}%"
 
 
 def num(v, nd: int = 0) -> str:
-    if v is None:
-        return "-"
-    return f"{v:,.{nd}f}"
+    return "-" if v is None else f"{v:,.{nd}f}"
 
 
 def money(v) -> str:
@@ -222,14 +184,6 @@ def distinct(rows: list[dict], key: str) -> str:
     vs = sorted({str(r[key]) for r in rows if r.get(key) not in (None, "")})
     return ", ".join(vs) if vs else "unknown"
 
-
-def task_split(tasks: Path) -> Counter:
-    if not tasks.exists():
-        return Counter()
-    return Counter(json.loads(line).get("set") for line in tasks.read_text().splitlines() if line.strip())
-
-
-# ---- sections ----
 
 def verdict_metric(e: dict | None) -> tuple[str, str]:
     if not e or e.get("median") is None or not e.get("ci"):
@@ -288,7 +242,7 @@ def render(rows: list[dict], runs_dir: Path = RUNS, out: Path = REPORT / "REPORT
     s, source = summary(good)
     setups = setups_of(good)
     others = [x for x in setups if x != BASE]
-    split = task_split(tasks)
+    split = Counter(splits(tasks).values())
 
     def link(run_id: str) -> str:
         return os.path.relpath(Path(runs_dir) / run_id / "events.jsonl", Path(out).parent)
@@ -338,17 +292,11 @@ def render(rows: list[dict], runs_dir: Path = RUNS, out: Path = REPORT / "REPORT
 
     L += ["## guardrail", ""]
     g = s["guardrail"]
-    if isinstance(g, str):
-        L.append(g)
-    elif isinstance(g, dict) and g:
-        for x, e in sorted(g.items()):
-            if not isinstance(e, dict):
-                L.append(f"- {x}: {e}")
-                continue
-            status = {True: "ok", False: "FAILED", None: "not enough data"}[e.get("ok")]
-            _, detail = verdict_pass(e)
-            L.append(f"- {x}: {status}. pass rate {detail}; allowed loss {100 * (e.get('margin') or MARGIN):.0f} pp.")
-    else:
+    for x, e in sorted(g.items()):
+        status = {True: "ok", False: "FAILED", None: "not enough data"}[e["ok"]]
+        _, detail = verdict_pass(e)
+        L.append(f"- {x}: {status}. pass rate {detail}; allowed loss {100 * e['margin']:.0f} pp.")
+    if not g:
         L.append("no ax setup to compare against A.")
     L.append("")
 
@@ -378,7 +326,7 @@ def render(rows: list[dict], runs_dir: Path = RUNS, out: Path = REPORT / "REPORT
     if not others:
         L.append("- no ax setup runs yet.")
     for x in others:
-        v, d = verdict_pass(g.get(x) if isinstance(g, dict) else None)
+        v, d = verdict_pass(g.get(x))
         parts = [f"pass rate: {v}. {d}"]
         for m in METRICS:
             v, d = verdict_metric((s["ratios"].get(f"{x}/{BASE}") or {}).get(m))
