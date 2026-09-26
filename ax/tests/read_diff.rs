@@ -106,7 +106,7 @@ fn read_binary_crlf_and_non_utf8() {
         "{out}"
     );
     assert!(out.contains("  a = 1\n"), "no stray \\r: {out:?}");
-    assert!(out.contains("caf\u{fffd}"), "{out}");
+    assert!(out.contains("café") && out.contains("windows-1252"), "{out}");
 }
 
 #[test]

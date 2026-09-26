@@ -96,7 +96,7 @@ pub fn to_json(hits: &[Hit]) -> Value {
             path: &h.rel,
             line: h.line,
             anchor: anchor(h.line, &h.bytes),
-            text: String::from_utf8_lossy(crate::hash::strip_eol(&h.bytes)).into_owned(),
+            text: crate::enc::show(crate::hash::strip_eol(&h.bytes)).into_owned(),
             symbol: h.symbol.as_ref().map(|s| s.path.as_str()),
             context: h.context,
         })

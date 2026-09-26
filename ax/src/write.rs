@@ -36,6 +36,25 @@ pub fn run(ctx: &Ctx, path: &str, opts: &WriteOpts, input: &[u8]) -> Result<Repo
         );
         return Ok(r);
     }
+    let enc = old
+        .as_deref()
+        .map(crate::enc::Enc::detect)
+        .unwrap_or(crate::enc::Enc::Utf8);
+    let encoded = match enc.encode(input) {
+        Ok(b) => b,
+        Err(c) => {
+            refuse(
+                &mut r,
+                format!(
+                    "{c:?} can't go in {rel}: it's {} and has no byte for that character",
+                    enc.label()
+                ),
+                "error",
+            );
+            return Ok(r);
+        }
+    };
+    let input: &[u8] = &encoded;
     let lines = crate::text::lines(input);
     if crate::text::looks_anchored(&lines) {
         refuse(

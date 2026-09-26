@@ -109,7 +109,7 @@ fn emit(
         rows.push(json!({
             "line": i + 1,
             "anchor": anchor(i + 1, l),
-            "text": String::from_utf8_lossy(hash::strip_eol(l)),
+            "text": crate::enc::show(hash::strip_eol(l)),
         }));
         stop = i + 1;
     }
@@ -194,10 +194,16 @@ pub fn run(ctx: &Ctx, paths: &[String], sym: Option<&str>, full: bool) -> Result
             continue;
         }
         let n = text::line_count(&src);
+        let enc = crate::enc::Enc::detect(&src);
         let header = format!(
-            "{rel}  ({}, hash {})",
+            "{rel}  ({}, hash {}{})",
             text::lines_label(n),
-            hash::file_hash(&src)
+            hash::file_hash(&src),
+            if enc == crate::enc::Enc::Utf8 {
+                String::new()
+            } else {
+                format!(", {}", enc.label())
+            }
         );
 
         if let Some(s) = sym {

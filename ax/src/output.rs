@@ -12,7 +12,7 @@ use serde_json::Value;
 /// `14:a3f1  code`. invalid utf-8 is shown lossily; the hash is still over the
 /// raw bytes.
 pub fn anchored(cfg: &Config, n: usize, line: &[u8]) -> String {
-    let text = String::from_utf8_lossy(strip_eol(line));
+    let text = crate::enc::show(strip_eol(line));
     if cfg.anchors {
         format!("{n}:{}  {text}", line_hash(line))
     } else {
@@ -180,10 +180,10 @@ mod tests {
     }
 
     #[test]
-    fn lossy_but_stable() {
+    fn non_utf8_shows_as_windows_1252() {
         let c = Config::default();
         let l = anchored(&c, 1, &[b'a', 0xff, b'b']);
-        assert!(l.ends_with("a\u{fffd}b"));
+        assert!(l.ends_with("aÿb"), "{l}");
     }
 
     #[test]

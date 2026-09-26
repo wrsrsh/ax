@@ -311,7 +311,7 @@ pub fn guard(rel: &str, old: Option<&[u8]>, new: &[u8]) -> Result<(), String> {
     let line = first_error_line(&tree).unwrap_or(1);
     let shown = crate::text::lines(new)
         .get(line - 1)
-        .map(|l| String::from_utf8_lossy(crate::hash::strip_eol(l)).into_owned())
+        .map(|l| crate::enc::show(crate::hash::strip_eol(l)).into_owned())
         .unwrap_or_default();
     Err(format!(
         "{rel}: this change doesn't parse ({after} syntax errors, the file had none); first around line {line}: {shown:?}"

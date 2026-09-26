@@ -332,6 +332,27 @@ struct Patched {
 }
 
 fn apply_hunks(ctx: &Ctx, rel: &str, src: &[u8], hunks: &[Hunk]) -> Result<Patched> {
+    let enc = crate::enc::Enc::detect(src);
+    let conv = |b: &[u8]| {
+        enc.encode(b).map(|c| c.into_owned()).map_err(|c| {
+            AxError(format!(
+                "{rel}: {c:?} can't go in this file: it's {} and has no byte for that character",
+                enc.label()
+            ))
+        })
+    };
+    let hunks: Vec<Hunk> = hunks
+        .iter()
+        .map(|h| {
+            Ok(Hunk {
+                old: h.old.iter().map(|l| conv(l)).collect::<Result<_>>()?,
+                new: h.new.iter().map(|l| conv(l)).collect::<Result<_>>()?,
+                seek: h.seek.as_deref().map(conv).transpose()?,
+                ..h.clone()
+            })
+        })
+        .collect::<Result<_>>()?;
+    let hunks = hunks.as_slice();
     let doc = Doc::parse(src);
     let had_nl = doc.ends_with_newline();
     let mut out: Vec<(Vec<u8>, Vec<u8>)> = Vec::new();
@@ -348,7 +369,7 @@ fn apply_hunks(ctx: &Ctx, rel: &str, src: &[u8], hunks: &[Hunk]) -> Result<Patch
                 hunks.len()
             );
             for o in h.old.iter().take(8) {
-                msg.push_str(&format!("  {}\n", String::from_utf8_lossy(o)));
+                msg.push_str(&format!("  {}\n", crate::enc::show(o)));
             }
             let contents: Vec<&[u8]> = (0..doc.lines.len()).map(|i| content(&doc, i)).collect();
             let want: Vec<&[u8]> = h.old.iter().map(Vec::as_slice).collect();

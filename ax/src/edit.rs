@@ -686,6 +686,40 @@ fn windows(regions: &[(usize, usize)], n: usize, ctx_lines: usize) -> Vec<(usize
     w
 }
 
+/// the agent writes UTF-8; a Windows-1252 file needs its text in 1252.
+fn transcode(ops: Vec<Op>, enc: crate::enc::Enc) -> Result<Vec<Op>, Refusal> {
+    let e = |b: &[u8]| {
+        enc.encode(b).map(|c| c.into_owned()).map_err(|c| {
+            Refusal::Syntax(format!(
+                "{c:?} can't go in this file: it's {} and has no byte for that character",
+                enc.label()
+            ))
+        })
+    };
+    let lines = |v: Vec<Vec<u8>>| v.iter().map(|b| e(b)).collect::<Result<Vec<_>, _>>();
+    ops.into_iter()
+        .map(|op| {
+            Ok(match op {
+                Op::Replace { from, to, body } => Op::Replace {
+                    from,
+                    to,
+                    body: lines(body)?,
+                },
+                Op::Insert { at, after, body } => Op::Insert {
+                    at,
+                    after,
+                    body: lines(body)?,
+                },
+                Op::FindWith { find, with } => Op::FindWith {
+                    find: e(&find)?,
+                    with: e(&with)?,
+                },
+                d @ Op::Delete { .. } => d,
+            })
+        })
+        .collect()
+}
+
 pub fn run(ctx: &Ctx, path: &str, input: &[u8], dry_run: bool) -> crate::Result<Report> {
     let abs = fsio::target(ctx, path)?;
     let rel = repo::rel(&ctx.root, &abs);
@@ -729,6 +763,12 @@ pub fn run(ctx: &Ctx, path: &str, input: &[u8], dry_run: bool) -> crate::Result<
         );
         return Ok(refusal_report(ctx, &rel, &src, &e));
     }
+    let ws = text::trailing_ws(&new_text);
+    let enc = crate::enc::Enc::detect(&src);
+    let ops = match transcode(ops, enc) {
+        Ok(o) => o,
+        Err(e) => return Ok(refusal_report(ctx, &rel, &src, &e)),
+    };
     let applied = match apply(&src, &ops, &ctx.cfg) {
         Ok(a) => a,
         Err(e) => return Ok(refusal_report(ctx, &rel, &src, &e)),
@@ -787,7 +827,6 @@ pub fn run(ctx: &Ctx, path: &str, input: &[u8], dry_run: bool) -> crate::Result<
             hash::file_hash(&applied.bytes)
         )
     };
-    let ws = text::trailing_ws(&new_text);
     if ws > 0 {
         summary.push_str(&format!(" note: {ws} new line(s) end in whitespace."));
     }
