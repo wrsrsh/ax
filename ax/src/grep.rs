@@ -36,6 +36,8 @@ pub struct GrepArgs {
 struct Collect {
     lines: Vec<(usize, Vec<u8>, bool)>,
     matches: usize,
+    /// hit a NUL after some matches (search stopped there)
+    binary: bool,
 }
 
 impl Sink for Collect {
@@ -63,6 +65,11 @@ impl Sink for Collect {
         let n = c.line_number().unwrap_or(0) as usize;
         self.lines.push((n, c.bytes().to_vec(), true));
         Ok(true)
+    }
+
+    fn binary_data(&mut self, _: &grep::searcher::Searcher, _: u64) -> std::io::Result<bool> {
+        self.binary = true;
+        Ok(false)
     }
 }
 
@@ -110,8 +117,12 @@ pub fn run(ctx: &Ctx, a: &GrepArgs) -> Result<Report> {
     let narrow = "--in <dir>, -t <type>, -g <glob> or a stricter pattern";
 
     if a.files_only || a.count {
+        // rg quirk we copy for parity: -c leaves out a file whose search
+        // stopped at a NUL after it had already matched (-l and plain mode
+        // still show it)
         let rows: Vec<(String, usize)> = per_file
             .iter()
+            .filter(|(_, _, c)| !(a.count && c.binary))
             .map(|(rel, _, c)| (rel.clone(), c.matches))
             .collect();
         let capped = Capped::new(rows, ctx.cfg.hit_cap());

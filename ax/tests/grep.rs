@@ -224,3 +224,27 @@ fn anchors_and_symbols_can_be_switched_off() {
     );
     assert_eq!(body(&o), vec!["src/app.ts", "  7  function helper() {"]);
 }
+
+#[test]
+fn binary_after_matches_follows_rg_per_mode() {
+    let t = tempfile::tempdir().unwrap();
+    git(t.path(), &["init", "-q"]);
+    // matches first, then a NUL well past the first buffer
+    let mut b = "needle\n".repeat(3).into_bytes();
+    b.extend(std::iter::repeat_n(b'x', 200_000));
+    b.extend(b"\n\0\nneedle\n");
+    std::fs::write(t.path().join("late-nul.txt"), &b).unwrap();
+    let plain = ax(t.path(), &["grep", "needle"]);
+    assert!(stdout(&plain).contains("late-nul.txt"));
+    assert!(stdout(&ax(t.path(), &["grep", "-l", "needle"])).contains("late-nul.txt"));
+    assert!(!stdout(&ax(t.path(), &["grep", "-c", "needle"])).contains("late-nul.txt"));
+    if have_rg() {
+        let rg = std::process::Command::new("rg")
+            .args(["-c", "needle", "."])
+            .current_dir(t.path())
+            .stdin(std::process::Stdio::null())
+            .output()
+            .unwrap();
+        assert!(!String::from_utf8_lossy(&rg.stdout).contains("late-nul"));
+    }
+}

@@ -4,3 +4,4 @@ __pycache__/
 *.pyc
 eval/runs/*/
 !eval/runs/.gitkeep
+eval/.cache/

@@ -1,0 +1,1737 @@
+{
+  "versions": {
+    "ax": "ax 0.1.0",
+    "ax commit": "eb2d6bb",
+    "rg": "ripgrep 14.1.0",
+    "repos": "hono@ee0622e144, ripgrep@3fce3b5bb0, requests@611c6162cb, cobra@adbc881390, ax@HEAD"
+  },
+  "cases": [
+    {
+      "repo": "hono",
+      "tool": "find",
+      "args": [],
+      "rg_count": 454,
+      "ax_count": 454,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "hono",
+      "tool": "find",
+      "args": [
+        "*.md"
+      ],
+      "rg_count": 8,
+      "ax_count": 8,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "hono",
+      "tool": "find",
+      "args": [
+        "**/*test*"
+      ],
+      "rg_count": 144,
+      "ax_count": 144,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "hono",
+      "tool": "find",
+      "args": [
+        "!*.md"
+      ],
+      "rg_count": 446,
+      "ax_count": 446,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "hono",
+      "tool": "grep",
+      "args": [
+        "TODO"
+      ],
+      "rg_count": 0,
+      "ax_count": 0,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "hono",
+      "tool": "grep",
+      "args": [
+        "-i",
+        "error"
+      ],
+      "rg_count": 1779,
+      "ax_count": 1779,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "hono",
+      "tool": "grep",
+      "args": [
+        "-w",
+        "self"
+      ],
+      "rg_count": 72,
+      "ax_count": 72,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "hono",
+      "tool": "grep",
+      "args": [
+        "-w",
+        "c"
+      ],
+      "rg_count": 4781,
+      "ax_count": 4781,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "hono",
+      "tool": "grep",
+      "args": [
+        "-F",
+        "()"
+      ],
+      "rg_count": 12170,
+      "ax_count": 12170,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "hono",
+      "tool": "grep",
+      "args": [
+        "-F",
+        "."
+      ],
+      "rg_count": 29994,
+      "ax_count": 29994,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "hono",
+      "tool": "grep",
+      "args": [
+        "return\\s+\\w+"
+      ],
+      "rg_count": 2267,
+      "ax_count": 2267,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "hono",
+      "tool": "grep",
+      "args": [
+        "^\\s*(pub )?fn "
+      ],
+      "rg_count": 0,
+      "ax_count": 0,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "hono",
+      "tool": "grep",
+      "args": [
+        "-S",
+        "Err"
+      ],
+      "rg_count": 915,
+      "ax_count": 915,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "hono",
+      "tool": "grep",
+      "args": [
+        "-S",
+        "err"
+      ],
+      "rg_count": 2454,
+      "ax_count": 2454,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "hono",
+      "tool": "grep",
+      "args": [
+        "-g",
+        "*.md",
+        "the"
+      ],
+      "rg_count": 74,
+      "ax_count": 74,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "hono",
+      "tool": "grep",
+      "args": [
+        "-g",
+        "!*.md",
+        "the"
+      ],
+      "rg_count": 1476,
+      "ax_count": 1476,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "hono",
+      "tool": "grep",
+      "args": [
+        "-t",
+        "rust",
+        "impl"
+      ],
+      "rg_count": 0,
+      "ax_count": 0,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "hono",
+      "tool": "grep",
+      "args": [
+        "-t",
+        "py",
+        "def"
+      ],
+      "rg_count": 0,
+      "ax_count": 0,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "hono",
+      "tool": "grep",
+      "args": [
+        "-t",
+        "go",
+        "func"
+      ],
+      "rg_count": 0,
+      "ax_count": 0,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "hono",
+      "tool": "grep",
+      "args": [
+        "-t",
+        "ts",
+        "export"
+      ],
+      "rg_count": 921,
+      "ax_count": 921,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "hono",
+      "tool": "grep",
+      "args": [
+        "-C",
+        "2",
+        "TODO"
+      ],
+      "rg_count": 0,
+      "ax_count": 0,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "hono",
+      "tool": "grep",
+      "args": [
+        "nothing-should-ever-match-this-zq9"
+      ],
+      "rg_count": 0,
+      "ax_count": 0,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "hono",
+      "tool": "grep",
+      "args": [
+        "-l",
+        "test"
+      ],
+      "rg_count": 155,
+      "ax_count": 155,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "hono",
+      "tool": "grep",
+      "args": [
+        "-c",
+        "test"
+      ],
+      "rg_count": 155,
+      "ax_count": 155,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ripgrep",
+      "tool": "find",
+      "args": [],
+      "rg_count": 231,
+      "ax_count": 231,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ripgrep",
+      "tool": "find",
+      "args": [
+        "*.md"
+      ],
+      "rg_count": 23,
+      "ax_count": 23,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ripgrep",
+      "tool": "find",
+      "args": [
+        "**/*test*"
+      ],
+      "rg_count": 7,
+      "ax_count": 7,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ripgrep",
+      "tool": "find",
+      "args": [
+        "!*.md"
+      ],
+      "rg_count": 208,
+      "ax_count": 208,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ripgrep",
+      "tool": "grep",
+      "args": [
+        "TODO"
+      ],
+      "rg_count": 9,
+      "ax_count": 9,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ripgrep",
+      "tool": "grep",
+      "args": [
+        "-i",
+        "error"
+      ],
+      "rg_count": 1337,
+      "ax_count": 1337,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ripgrep",
+      "tool": "grep",
+      "args": [
+        "-w",
+        "self"
+      ],
+      "rg_count": 4889,
+      "ax_count": 4889,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ripgrep",
+      "tool": "grep",
+      "args": [
+        "-w",
+        "c"
+      ],
+      "rg_count": 251,
+      "ax_count": 251,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ripgrep",
+      "tool": "grep",
+      "args": [
+        "-F",
+        "()"
+      ],
+      "rg_count": 8132,
+      "ax_count": 8132,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ripgrep",
+      "tool": "grep",
+      "args": [
+        "-F",
+        "."
+      ],
+      "rg_count": 30353,
+      "ax_count": 30353,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ripgrep",
+      "tool": "grep",
+      "args": [
+        "return\\s+\\w+"
+      ],
+      "rg_count": 660,
+      "ax_count": 660,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ripgrep",
+      "tool": "grep",
+      "args": [
+        "^\\s*(pub )?fn "
+      ],
+      "rg_count": 2732,
+      "ax_count": 2732,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ripgrep",
+      "tool": "grep",
+      "args": [
+        "-S",
+        "Err"
+      ],
+      "rg_count": 987,
+      "ax_count": 987,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ripgrep",
+      "tool": "grep",
+      "args": [
+        "-S",
+        "err"
+      ],
+      "rg_count": 2653,
+      "ax_count": 2653,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ripgrep",
+      "tool": "grep",
+      "args": [
+        "-g",
+        "*.md",
+        "the"
+      ],
+      "rg_count": 875,
+      "ax_count": 875,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ripgrep",
+      "tool": "grep",
+      "args": [
+        "-g",
+        "!*.md",
+        "the"
+      ],
+      "rg_count": 5958,
+      "ax_count": 5958,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ripgrep",
+      "tool": "grep",
+      "args": [
+        "-t",
+        "rust",
+        "impl"
+      ],
+      "rg_count": 793,
+      "ax_count": 793,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ripgrep",
+      "tool": "grep",
+      "args": [
+        "-t",
+        "py",
+        "def"
+      ],
+      "rg_count": 0,
+      "ax_count": 0,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ripgrep",
+      "tool": "grep",
+      "args": [
+        "-t",
+        "go",
+        "func"
+      ],
+      "rg_count": 0,
+      "ax_count": 0,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ripgrep",
+      "tool": "grep",
+      "args": [
+        "-t",
+        "ts",
+        "export"
+      ],
+      "rg_count": 0,
+      "ax_count": 0,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ripgrep",
+      "tool": "grep",
+      "args": [
+        "-C",
+        "2",
+        "TODO"
+      ],
+      "rg_count": 9,
+      "ax_count": 9,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ripgrep",
+      "tool": "grep",
+      "args": [
+        "nothing-should-ever-match-this-zq9"
+      ],
+      "rg_count": 0,
+      "ax_count": 0,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ripgrep",
+      "tool": "grep",
+      "args": [
+        "-l",
+        "test"
+      ],
+      "rg_count": 82,
+      "ax_count": 82,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ripgrep",
+      "tool": "grep",
+      "args": [
+        "-c",
+        "test"
+      ],
+      "rg_count": 81,
+      "ax_count": 81,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "requests",
+      "tool": "find",
+      "args": [],
+      "rg_count": 102,
+      "ax_count": 102,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "requests",
+      "tool": "find",
+      "args": [
+        "*.md"
+      ],
+      "rg_count": 5,
+      "ax_count": 5,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "requests",
+      "tool": "find",
+      "args": [
+        "**/*test*"
+      ],
+      "rg_count": 10,
+      "ax_count": 10,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "requests",
+      "tool": "find",
+      "args": [
+        "!*.md"
+      ],
+      "rg_count": 97,
+      "ax_count": 97,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "requests",
+      "tool": "grep",
+      "args": [
+        "TODO"
+      ],
+      "rg_count": 7,
+      "ax_count": 7,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "requests",
+      "tool": "grep",
+      "args": [
+        "-i",
+        "error"
+      ],
+      "rg_count": 476,
+      "ax_count": 476,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "requests",
+      "tool": "grep",
+      "args": [
+        "-w",
+        "self"
+      ],
+      "rg_count": 1025,
+      "ax_count": 1025,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "requests",
+      "tool": "grep",
+      "args": [
+        "-w",
+        "c"
+      ],
+      "rg_count": 30,
+      "ax_count": 30,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "requests",
+      "tool": "grep",
+      "args": [
+        "-F",
+        "()"
+      ],
+      "rg_count": 725,
+      "ax_count": 725,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "requests",
+      "tool": "grep",
+      "args": [
+        "-F",
+        "."
+      ],
+      "rg_count": 6482,
+      "ax_count": 6482,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "requests",
+      "tool": "grep",
+      "args": [
+        "return\\s+\\w+"
+      ],
+      "rg_count": 297,
+      "ax_count": 297,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "requests",
+      "tool": "grep",
+      "args": [
+        "^\\s*(pub )?fn "
+      ],
+      "rg_count": 1,
+      "ax_count": 1,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "requests",
+      "tool": "grep",
+      "args": [
+        "-S",
+        "Err"
+      ],
+      "rg_count": 363,
+      "ax_count": 363,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "requests",
+      "tool": "grep",
+      "args": [
+        "-S",
+        "err"
+      ],
+      "rg_count": 553,
+      "ax_count": 553,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "requests",
+      "tool": "grep",
+      "args": [
+        "-g",
+        "*.md",
+        "the"
+      ],
+      "rg_count": 238,
+      "ax_count": 238,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "requests",
+      "tool": "grep",
+      "args": [
+        "-g",
+        "!*.md",
+        "the"
+      ],
+      "rg_count": 1393,
+      "ax_count": 1393,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "requests",
+      "tool": "grep",
+      "args": [
+        "-t",
+        "rust",
+        "impl"
+      ],
+      "rg_count": 0,
+      "ax_count": 0,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "requests",
+      "tool": "grep",
+      "args": [
+        "-t",
+        "py",
+        "def"
+      ],
+      "rg_count": 821,
+      "ax_count": 821,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "requests",
+      "tool": "grep",
+      "args": [
+        "-t",
+        "go",
+        "func"
+      ],
+      "rg_count": 0,
+      "ax_count": 0,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "requests",
+      "tool": "grep",
+      "args": [
+        "-t",
+        "ts",
+        "export"
+      ],
+      "rg_count": 0,
+      "ax_count": 0,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "requests",
+      "tool": "grep",
+      "args": [
+        "-C",
+        "2",
+        "TODO"
+      ],
+      "rg_count": 7,
+      "ax_count": 7,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "requests",
+      "tool": "grep",
+      "args": [
+        "nothing-should-ever-match-this-zq9"
+      ],
+      "rg_count": 0,
+      "ax_count": 0,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "requests",
+      "tool": "grep",
+      "args": [
+        "-l",
+        "test"
+      ],
+      "rg_count": 36,
+      "ax_count": 36,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "requests",
+      "tool": "grep",
+      "args": [
+        "-c",
+        "test"
+      ],
+      "rg_count": 36,
+      "ax_count": 36,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "cobra",
+      "tool": "find",
+      "args": [],
+      "rg_count": 59,
+      "ax_count": 59,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "cobra",
+      "tool": "find",
+      "args": [
+        "*.md"
+      ],
+      "rg_count": 17,
+      "ax_count": 17,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "cobra",
+      "tool": "find",
+      "args": [
+        "**/*test*"
+      ],
+      "rg_count": 17,
+      "ax_count": 17,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "cobra",
+      "tool": "find",
+      "args": [
+        "!*.md"
+      ],
+      "rg_count": 42,
+      "ax_count": 42,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "cobra",
+      "tool": "grep",
+      "args": [
+        "TODO"
+      ],
+      "rg_count": 3,
+      "ax_count": 3,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "cobra",
+      "tool": "grep",
+      "args": [
+        "-i",
+        "error"
+      ],
+      "rg_count": 979,
+      "ax_count": 979,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "cobra",
+      "tool": "grep",
+      "args": [
+        "-w",
+        "self"
+      ],
+      "rg_count": 0,
+      "ax_count": 0,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "cobra",
+      "tool": "grep",
+      "args": [
+        "-w",
+        "c"
+      ],
+      "rg_count": 1121,
+      "ax_count": 1121,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "cobra",
+      "tool": "grep",
+      "args": [
+        "-F",
+        "()"
+      ],
+      "rg_count": 1205,
+      "ax_count": 1205,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "cobra",
+      "tool": "grep",
+      "args": [
+        "-F",
+        "."
+      ],
+      "rg_count": 5570,
+      "ax_count": 5570,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "cobra",
+      "tool": "grep",
+      "args": [
+        "return\\s+\\w+"
+      ],
+      "rg_count": 479,
+      "ax_count": 479,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "cobra",
+      "tool": "grep",
+      "args": [
+        "^\\s*(pub )?fn "
+      ],
+      "rg_count": 4,
+      "ax_count": 4,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "cobra",
+      "tool": "grep",
+      "args": [
+        "-S",
+        "Err"
+      ],
+      "rg_count": 917,
+      "ax_count": 917,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "cobra",
+      "tool": "grep",
+      "args": [
+        "-S",
+        "err"
+      ],
+      "rg_count": 2118,
+      "ax_count": 2118,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "cobra",
+      "tool": "grep",
+      "args": [
+        "-g",
+        "*.md",
+        "the"
+      ],
+      "rg_count": 376,
+      "ax_count": 376,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "cobra",
+      "tool": "grep",
+      "args": [
+        "-g",
+        "!*.md",
+        "the"
+      ],
+      "rg_count": 1334,
+      "ax_count": 1334,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "cobra",
+      "tool": "grep",
+      "args": [
+        "-t",
+        "rust",
+        "impl"
+      ],
+      "rg_count": 0,
+      "ax_count": 0,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "cobra",
+      "tool": "grep",
+      "args": [
+        "-t",
+        "py",
+        "def"
+      ],
+      "rg_count": 0,
+      "ax_count": 0,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "cobra",
+      "tool": "grep",
+      "args": [
+        "-t",
+        "go",
+        "func"
+      ],
+      "rg_count": 953,
+      "ax_count": 953,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "cobra",
+      "tool": "grep",
+      "args": [
+        "-t",
+        "ts",
+        "export"
+      ],
+      "rg_count": 0,
+      "ax_count": 0,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "cobra",
+      "tool": "grep",
+      "args": [
+        "-C",
+        "2",
+        "TODO"
+      ],
+      "rg_count": 3,
+      "ax_count": 3,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "cobra",
+      "tool": "grep",
+      "args": [
+        "nothing-should-ever-match-this-zq9"
+      ],
+      "rg_count": 0,
+      "ax_count": 0,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "cobra",
+      "tool": "grep",
+      "args": [
+        "-l",
+        "test"
+      ],
+      "rg_count": 32,
+      "ax_count": 32,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "cobra",
+      "tool": "grep",
+      "args": [
+        "-c",
+        "test"
+      ],
+      "rg_count": 32,
+      "ax_count": 32,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ax",
+      "tool": "find",
+      "args": [],
+      "rg_count": 36,
+      "ax_count": 36,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ax",
+      "tool": "find",
+      "args": [
+        "*.md"
+      ],
+      "rg_count": 3,
+      "ax_count": 3,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ax",
+      "tool": "find",
+      "args": [
+        "**/*test*"
+      ],
+      "rg_count": 2,
+      "ax_count": 2,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ax",
+      "tool": "find",
+      "args": [
+        "!*.md"
+      ],
+      "rg_count": 33,
+      "ax_count": 33,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ax",
+      "tool": "grep",
+      "args": [
+        "TODO"
+      ],
+      "rg_count": 22,
+      "ax_count": 22,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ax",
+      "tool": "grep",
+      "args": [
+        "-i",
+        "error"
+      ],
+      "rg_count": 69,
+      "ax_count": 69,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ax",
+      "tool": "grep",
+      "args": [
+        "-w",
+        "self"
+      ],
+      "rg_count": 52,
+      "ax_count": 52,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ax",
+      "tool": "grep",
+      "args": [
+        "-w",
+        "c"
+      ],
+      "rg_count": 117,
+      "ax_count": 117,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ax",
+      "tool": "grep",
+      "args": [
+        "-F",
+        "()"
+      ],
+      "rg_count": 1003,
+      "ax_count": 1003,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ax",
+      "tool": "grep",
+      "args": [
+        "-F",
+        "."
+      ],
+      "rg_count": 1890,
+      "ax_count": 1890,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ax",
+      "tool": "grep",
+      "args": [
+        "return\\s+\\w+"
+      ],
+      "rg_count": 56,
+      "ax_count": 56,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ax",
+      "tool": "grep",
+      "args": [
+        "^\\s*(pub )?fn "
+      ],
+      "rg_count": 172,
+      "ax_count": 172,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ax",
+      "tool": "grep",
+      "args": [
+        "-S",
+        "Err"
+      ],
+      "rg_count": 46,
+      "ax_count": 46,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ax",
+      "tool": "grep",
+      "args": [
+        "-S",
+        "err"
+      ],
+      "rg_count": 117,
+      "ax_count": 117,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ax",
+      "tool": "grep",
+      "args": [
+        "-g",
+        "*.md",
+        "the"
+      ],
+      "rg_count": 21,
+      "ax_count": 21,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ax",
+      "tool": "grep",
+      "args": [
+        "-g",
+        "!*.md",
+        "the"
+      ],
+      "rg_count": 134,
+      "ax_count": 134,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ax",
+      "tool": "grep",
+      "args": [
+        "-t",
+        "rust",
+        "impl"
+      ],
+      "rg_count": 19,
+      "ax_count": 19,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ax",
+      "tool": "grep",
+      "args": [
+        "-t",
+        "py",
+        "def"
+      ],
+      "rg_count": 22,
+      "ax_count": 22,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ax",
+      "tool": "grep",
+      "args": [
+        "-t",
+        "go",
+        "func"
+      ],
+      "rg_count": 0,
+      "ax_count": 0,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ax",
+      "tool": "grep",
+      "args": [
+        "-t",
+        "ts",
+        "export"
+      ],
+      "rg_count": 0,
+      "ax_count": 0,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ax",
+      "tool": "grep",
+      "args": [
+        "-C",
+        "2",
+        "TODO"
+      ],
+      "rg_count": 22,
+      "ax_count": 22,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ax",
+      "tool": "grep",
+      "args": [
+        "nothing-should-ever-match-this-zq9"
+      ],
+      "rg_count": 11,
+      "ax_count": 11,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ax",
+      "tool": "grep",
+      "args": [
+        "-l",
+        "test"
+      ],
+      "rg_count": 25,
+      "ax_count": 25,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    },
+    {
+      "repo": "ax",
+      "tool": "grep",
+      "args": [
+        "-c",
+        "test"
+      ],
+      "rg_count": 25,
+      "ax_count": 25,
+      "only_rg": [],
+      "only_ax": [],
+      "ok": true
+    }
+  ],
+  "bench": [
+    {
+      "repo": "hono",
+      "case": "files",
+      "ax_mean_ms": 4.019929193232176,
+      "ax_stddev_ms": 0.19958379692216466,
+      "rg_mean_ms": 5.261937792338314,
+      "rg_stddev_ms": 0.6160346857206235,
+      "raw": "report/hyperfine/hono-files.json"
+    },
+    {
+      "repo": "hono",
+      "case": "grep literal",
+      "ax_mean_ms": 14.439979283232322,
+      "ax_stddev_ms": 0.23783916583101788,
+      "rg_mean_ms": 6.280837016306306,
+      "rg_stddev_ms": 0.6295964408497062,
+      "raw": "report/hyperfine/hono-grep-literal.json"
+    },
+    {
+      "repo": "hono",
+      "case": "grep regex",
+      "ax_mean_ms": 15.617468852903224,
+      "ax_stddev_ms": 0.4363344329400158,
+      "rg_mean_ms": 11.04263066277992,
+      "rg_stddev_ms": 0.630517449710576,
+      "raw": "report/hyperfine/hono-grep-regex.json"
+    },
+    {
+      "repo": "hono",
+      "case": "grep -i word",
+      "ax_mean_ms": 21.495234726764707,
+      "ax_stddev_ms": 0.38569316428915845,
+      "rg_mean_ms": 6.47187134,
+      "rg_stddev_ms": 0.632828312197318,
+      "raw": "report/hyperfine/hono-grep--i-word.json"
+    },
+    {
+      "repo": "ripgrep",
+      "case": "files",
+      "ax_mean_ms": 2.902242079640857,
+      "ax_stddev_ms": 0.18469573876850318,
+      "rg_mean_ms": 4.927349104323485,
+      "rg_stddev_ms": 0.6470019032589209,
+      "raw": "report/hyperfine/ripgrep-files.json"
+    },
+    {
+      "repo": "ripgrep",
+      "case": "grep literal",
+      "ax_mean_ms": 4.241065120318465,
+      "ax_stddev_ms": 0.26455678235306274,
+      "rg_mean_ms": 5.499452732802771,
+      "rg_stddev_ms": 0.5969000762875072,
+      "raw": "report/hyperfine/ripgrep-grep-literal.json"
+    },
+    {
+      "repo": "ripgrep",
+      "case": "grep regex",
+      "ax_mean_ms": 9.833453549122805,
+      "ax_stddev_ms": 0.20448485430904298,
+      "rg_mean_ms": 10.295315170631966,
+      "rg_stddev_ms": 0.5991034544143815,
+      "raw": "report/hyperfine/ripgrep-grep-regex.json"
+    },
+    {
+      "repo": "ripgrep",
+      "case": "grep -i word",
+      "ax_mean_ms": 7.116522067500001,
+      "ax_stddev_ms": 0.2024051035835599,
+      "rg_mean_ms": 5.691579072340429,
+      "rg_stddev_ms": 0.58579253043249,
+      "raw": "report/hyperfine/ripgrep-grep--i-word.json"
+    },
+    {
+      "repo": "requests",
+      "case": "files",
+      "ax_mean_ms": 2.0764564500423375,
+      "ax_stddev_ms": 0.1739569717518081,
+      "rg_mean_ms": 3.1074081631701658,
+      "rg_stddev_ms": 0.4249003030822724,
+      "raw": "report/hyperfine/requests-files.json"
+    },
+    {
+      "repo": "requests",
+      "case": "grep literal",
+      "ax_mean_ms": 7.512424998612716,
+      "ax_stddev_ms": 0.22306086819307303,
+      "rg_mean_ms": 4.643021870803858,
+      "rg_stddev_ms": 0.5173867353967224,
+      "raw": "report/hyperfine/requests-grep-literal.json"
+    },
+    {
+      "repo": "requests",
+      "case": "grep regex",
+      "ax_mean_ms": 14.371342032682923,
+      "ax_stddev_ms": 0.2639336491993853,
+      "rg_mean_ms": 9.609298745144692,
+      "rg_stddev_ms": 0.6033722632737016,
+      "raw": "report/hyperfine/requests-grep-regex.json"
+    },
+    {
+      "repo": "requests",
+      "case": "grep -i word",
+      "ax_mean_ms": 33.04479509111109,
+      "ax_stddev_ms": 0.8034424517847972,
+      "rg_mean_ms": 4.834120695324165,
+      "rg_stddev_ms": 0.5182136974001738,
+      "raw": "report/hyperfine/requests-grep--i-word.json"
+    },
+    {
+      "repo": "cobra",
+      "case": "files",
+      "ax_mean_ms": 2.281224971172787,
+      "ax_stddev_ms": 0.17465734748259387,
+      "rg_mean_ms": 3.134966739578452,
+      "rg_stddev_ms": 0.4339522073776514,
+      "raw": "report/hyperfine/cobra-files.json"
+    },
+    {
+      "repo": "cobra",
+      "case": "grep literal",
+      "ax_mean_ms": 5.323991388502027,
+      "ax_stddev_ms": 0.18475273385937838,
+      "rg_mean_ms": 4.4344369607309,
+      "rg_stddev_ms": 0.47039022386173224,
+      "raw": "report/hyperfine/cobra-grep-literal.json"
+    },
+    {
+      "repo": "cobra",
+      "case": "grep regex",
+      "ax_mean_ms": 12.539544665217395,
+      "ax_stddev_ms": 0.22427002702607432,
+      "rg_mean_ms": 9.527558423611103,
+      "rg_stddev_ms": 0.5649568532451449,
+      "raw": "report/hyperfine/cobra-grep-regex.json"
+    },
+    {
+      "repo": "cobra",
+      "case": "grep -i word",
+      "ax_mean_ms": 8.144570106590258,
+      "ax_stddev_ms": 0.2485186449624375,
+      "rg_mean_ms": 4.862241323138833,
+      "rg_stddev_ms": 0.5117517492256335,
+      "raw": "report/hyperfine/cobra-grep--i-word.json"
+    },
+    {
+      "repo": "ax",
+      "case": "files",
+      "ax_mean_ms": 1.7663199210714287,
+      "ax_stddev_ms": 0.17678782883273586,
+      "rg_mean_ms": 2.999276349811323,
+      "rg_stddev_ms": 0.3897019837600547,
+      "raw": "report/hyperfine/ax-files.json"
+    },
+    {
+      "repo": "ax",
+      "case": "grep literal",
+      "ax_mean_ms": 19.130029460529798,
+      "ax_stddev_ms": 0.2695092688393117,
+      "rg_mean_ms": 3.707953243804341,
+      "rg_stddev_ms": 0.5187636936761754,
+      "raw": "report/hyperfine/ax-grep-literal.json"
+    },
+    {
+      "repo": "ax",
+      "case": "grep regex",
+      "ax_mean_ms": 15.578317756825403,
+      "ax_stddev_ms": 0.20446084182223062,
+      "rg_mean_ms": 8.535087488813566,
+      "rg_stddev_ms": 0.45770160114931135,
+      "raw": "report/hyperfine/ax-grep-regex.json"
+    },
+    {
+      "repo": "ax",
+      "case": "grep -i word",
+      "ax_mean_ms": 11.43194468796875,
+      "ax_stddev_ms": 0.24701078600199752,
+      "rg_mean_ms": 3.9621383063924074,
+      "rg_stddev_ms": 0.4874003185076287,
+      "raw": "report/hyperfine/ax-grep--i-word.json"
+    }
+  ]
+}
