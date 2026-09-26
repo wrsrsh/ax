@@ -102,16 +102,31 @@ enum Cmd {
         full: bool,
     },
     /// apply anchored edit ops from stdin
-    Edit { path: String },
+    Edit {
+        path: String,
+        /// show the result, write nothing
+        #[arg(long)]
+        dry_run: bool,
+    },
     /// write a whole file from stdin
     Write {
         path: String,
         /// only if the file still has this hash (from `ax read`)
         #[arg(long = "if")]
         if_hash: Option<String>,
+        /// overwrite an existing file without --if
+        #[arg(long)]
+        force: bool,
+        /// show the result, write nothing
+        #[arg(long)]
+        dry_run: bool,
     },
     /// apply a multi-file patch from stdin
-    Patch,
+    Patch {
+        /// check the patch applies, write nothing
+        #[arg(long)]
+        dry_run: bool,
+    },
     /// git status + stat + capped hunks
     Diff {
         /// every hunk, no cap
@@ -193,9 +208,21 @@ fn run(ctx: &Ctx, cmd: Cmd) -> ax::Result<Report> {
             within,
         } => ax::symbols::refs(ctx, &sym, code_only, &within),
         Cmd::Read { paths, sym, full } => ax::read::run(ctx, &paths, sym.as_deref(), full),
-        Cmd::Edit { path } => ax::edit::run(ctx, &path, &stdin()?),
-        Cmd::Write { path, if_hash } => ax::write::run(ctx, &path, if_hash.as_deref(), &stdin()?),
-        Cmd::Patch => ax::patch::run(ctx, &stdin()?),
+        Cmd::Edit { path, dry_run } => ax::edit::run(ctx, &path, &stdin()?, dry_run),
+        Cmd::Write {
+            path,
+            if_hash,
+            force,
+            dry_run,
+        } => {
+            let opts = ax::write::WriteOpts {
+                if_hash: if_hash.as_deref(),
+                force,
+                dry_run,
+            };
+            ax::write::run(ctx, &path, &opts, &stdin()?)
+        }
+        Cmd::Patch { dry_run } => ax::patch::run(ctx, &stdin()?, dry_run),
         Cmd::Diff { full, paths } => ax::diff::run(ctx, full, &paths),
         Cmd::AgentHelp { env } => Ok(ax::help::run(env)),
     }

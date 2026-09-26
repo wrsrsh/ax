@@ -5,7 +5,14 @@ use crate::output::{Report, Summary};
 use crate::{AxError, Ctx, Result, fsio, hash, repo, text};
 use serde_json::json;
 
-pub fn run(ctx: &Ctx, path: &str, if_hash: Option<&str>, input: &[u8]) -> Result<Report> {
+pub struct WriteOpts<'a> {
+    pub if_hash: Option<&'a str>,
+    pub force: bool,
+    pub dry_run: bool,
+}
+
+pub fn run(ctx: &Ctx, path: &str, opts: &WriteOpts, input: &[u8]) -> Result<Report> {
+    let if_hash = opts.if_hash;
     let abs = fsio::target(ctx, path)?;
     let rel = repo::rel(&ctx.root, &abs);
     if abs.is_dir() {
@@ -13,6 +20,31 @@ pub fn run(ctx: &Ctx, path: &str, if_hash: Option<&str>, input: &[u8]) -> Result
     }
     let old = std::fs::read(&abs).ok();
     let mut r = Report::new("write");
+    let refuse = |r: &mut Report, msg: String, outcome: &str| {
+        r.lines.push(msg);
+        r.summary = Summary::plain(format!("nothing written ({outcome})."));
+        r.failed = true;
+        r.data = json!({"path": rel, "outcome": outcome});
+    };
+    if old.is_some() && if_hash.is_none() && !opts.force {
+        refuse(
+            &mut r,
+            format!(
+                "{rel} already exists. read it first and pass `--if <hash>` from the header, or --force to overwrite it blind."
+            ),
+            "error",
+        );
+        return Ok(r);
+    }
+    let lines = crate::text::lines(input);
+    if crate::text::looks_anchored(&lines) {
+        refuse(
+            &mut r,
+            "the content starts with LINE:HASH anchors copied from ax output; send just the code, without the `12:a3f1  ` prefix".into(),
+            "error",
+        );
+        return Ok(r);
+    }
     if let Some(want) = if_hash {
         let have = old.as_deref().map(hash::file_hash);
         if have.as_deref() != Some(want) {
@@ -40,7 +72,9 @@ pub fn run(ctx: &Ctx, path: &str, if_hash: Option<&str>, input: &[u8]) -> Result
         r.data = json!({"path": rel, "outcome": "parse-rejected"});
         return Ok(r);
     }
-    fsio::atomic_write(&abs, input)?;
+    if !opts.dry_run {
+        fsio::atomic_write(&abs, input)?;
+    }
     let n = text::line_count(input);
     let what = match &old {
         None => "created".to_string(),
@@ -53,16 +87,44 @@ pub fn run(ctx: &Ctx, path: &str, if_hash: Option<&str>, input: &[u8]) -> Result
             )
         }
     };
-    r.summary = Summary::plain(format!(
-        "wrote {rel}: {what}, hash {}.",
+    let mut summary = format!(
+        "{} {rel}: {what}, hash {}.",
+        if opts.dry_run {
+            "dry run, nothing written. would write"
+        } else {
+            "wrote"
+        },
         hash::file_hash(input)
-    ));
+    );
+    let old_lines: std::collections::HashSet<&[u8]> = old
+        .as_deref()
+        .map(|o| {
+            crate::text::lines(o)
+                .into_iter()
+                .map(crate::hash::strip_eol)
+                .collect()
+        })
+        .unwrap_or_default();
+    let fresh: Vec<&[u8]> = lines
+        .iter()
+        .map(|l| crate::hash::strip_eol(l))
+        .filter(|l| !old_lines.contains(l))
+        .collect();
+    let ws = crate::text::trailing_ws(&fresh);
+    if ws > 0 {
+        summary.push_str(&format!(" note: {ws} new line(s) end in whitespace."));
+    }
+    if !input.is_empty() && !input.ends_with(b"\n") {
+        summary.push_str(" note: no newline at end of file.");
+    }
+    r.summary = Summary::plain(summary);
     r.data = json!({
         "path": rel,
         "outcome": "ok",
         "created": old.is_none(),
         "lines": n,
         "hash": hash::file_hash(input),
+        "dry_run": opts.dry_run,
     });
     Ok(r)
 }

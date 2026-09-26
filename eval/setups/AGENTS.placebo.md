@@ -21,3 +21,4 @@ If something is unclear, pick the most conservative reading of the task and keep
 Leave generated files, lockfiles and vendored code alone unless the task is about them.
 Keep commits focused: one logical change, with the reason in the message, and no stray debug output or commented-out code left behind.
 When a test fails, read the assertion and the code under test before changing either; the test is usually right.
+Prefer reading the code that is there over guessing how it probably works; names in this repository are not always what they seem, and older modules may follow different conventions than newer ones.

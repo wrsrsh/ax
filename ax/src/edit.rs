@@ -686,7 +686,7 @@ fn windows(regions: &[(usize, usize)], n: usize, ctx_lines: usize) -> Vec<(usize
     w
 }
 
-pub fn run(ctx: &Ctx, path: &str, input: &[u8]) -> crate::Result<Report> {
+pub fn run(ctx: &Ctx, path: &str, input: &[u8], dry_run: bool) -> crate::Result<Report> {
     let abs = fsio::target(ctx, path)?;
     let rel = repo::rel(&ctx.root, &abs);
     if !abs.is_file() {
@@ -704,6 +704,31 @@ pub fn run(ctx: &Ctx, path: &str, input: &[u8]) -> crate::Result<Report> {
         Ok(o) => o,
         Err(e) => return Ok(refusal_report(ctx, &rel, &src, &e)),
     };
+    let bodies: Vec<&Vec<u8>> = ops
+        .iter()
+        .flat_map(|op| match op {
+            Op::Replace { body, .. } | Op::Insert { body, .. } => body.iter().collect(),
+            _ => Vec::new(),
+        })
+        .collect();
+    let with_lines: Vec<&[u8]> = ops
+        .iter()
+        .flat_map(|op| match op {
+            Op::FindWith { with, .. } => with.split(|&b| b == b'\n').collect(),
+            _ => Vec::new(),
+        })
+        .collect();
+    let new_text: Vec<&[u8]> = bodies
+        .iter()
+        .map(|b| b.as_slice())
+        .chain(with_lines)
+        .collect();
+    if text::looks_anchored(&new_text) {
+        let e = Refusal::Syntax(
+            "the new lines start with LINE:HASH anchors copied from ax output; send just the code, without the `12:a3f1  ` prefix".into(),
+        );
+        return Ok(refusal_report(ctx, &rel, &src, &e));
+    }
     let applied = match apply(&src, &ops, &ctx.cfg) {
         Ok(a) => a,
         Err(e) => return Ok(refusal_report(ctx, &rel, &src, &e)),
@@ -713,7 +738,7 @@ pub fn run(ctx: &Ctx, path: &str, input: &[u8]) -> crate::Result<Report> {
     {
         return Ok(refusal_report(ctx, &rel, &src, &Refusal::Parse(m)));
     }
-    if applied.bytes != src {
+    if applied.bytes != src && !dry_run {
         fsio::atomic_write(&abs, &applied.bytes)?;
     }
 
@@ -747,15 +772,26 @@ pub fn run(ctx: &Ctx, path: &str, input: &[u8]) -> crate::Result<Report> {
     } else {
         "ok"
     };
-    r.summary = Summary::plain(if applied.bytes == src {
+    let mut summary = if applied.bytes == src {
         "no change (the ops produced the same bytes).".to_string()
+    } else if dry_run {
+        format!(
+            "dry run: nothing written. {rel} would be {} (hash {}).",
+            text::lines_label(new_lines.len()),
+            hash::file_hash(&applied.bytes)
+        )
     } else {
         format!(
             "wrote {rel} ({}, hash {}). anchors above are fresh.",
             text::lines_label(new_lines.len()),
             hash::file_hash(&applied.bytes)
         )
-    });
+    };
+    let ws = text::trailing_ws(&new_text);
+    if ws > 0 {
+        summary.push_str(&format!(" note: {ws} new line(s) end in whitespace."));
+    }
+    r.summary = Summary::plain(summary);
     r.data = json!({
         "path": rel,
         "outcome": outcome,
@@ -763,6 +799,7 @@ pub fn run(ctx: &Ctx, path: &str, input: &[u8]) -> crate::Result<Report> {
         "removed": applied.removed,
         "relocated": applied.relocated,
         "hash": hash::file_hash(&applied.bytes),
+        "dry_run": dry_run,
     });
     Ok(r)
 }

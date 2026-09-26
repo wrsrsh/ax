@@ -414,8 +414,29 @@ fn apply_hunks(ctx: &Ctx, rel: &str, src: &[u8], hunks: &[Hunk]) -> Result<Patch
     })
 }
 
-pub fn run(ctx: &Ctx, input: &[u8]) -> Result<Report> {
+pub fn run(ctx: &Ctx, input: &[u8], dry_run: bool) -> Result<Report> {
     let patches = parse(input)?;
+    let added: Vec<&[u8]> = patches
+        .iter()
+        .flat_map(|p| match p {
+            FilePatch::Add { lines, .. } => lines.iter().map(Vec::as_slice).collect::<Vec<_>>(),
+            FilePatch::Update { hunks, .. } => hunks
+                .iter()
+                .flat_map(|h| {
+                    h.new
+                        .iter()
+                        .filter(|l| !h.old.contains(l))
+                        .map(Vec::as_slice)
+                })
+                .collect(),
+            FilePatch::Delete { .. } => Vec::new(),
+        })
+        .collect();
+    if text::looks_anchored(&added) {
+        return Err(AxError(
+            "the added lines start with LINE:HASH anchors copied from ax output; send just the code, without the `12:a3f1  ` prefix. nothing written.".into(),
+        ));
+    }
     let resolve = |p: &str| -> Result<(PathBuf, String)> {
         let abs = fsio::target(ctx, p)?;
         let rel = repo::rel(&ctx.root, &abs);
@@ -508,7 +529,9 @@ pub fn run(ctx: &Ctx, input: &[u8]) -> Result<Report> {
             })?;
         }
     }
-    fsio::atomic_write_all(&writes)?;
+    if !dry_run {
+        fsio::atomic_write_all(&writes)?;
+    }
 
     let mut r = Report::new("patch");
     r.lines = lines;
@@ -534,10 +557,20 @@ pub fn run(ctx: &Ctx, input: &[u8]) -> Result<Report> {
         }
         r.lines.pop();
     }
-    r.summary = Summary::plain(format!(
-        "patched {} (+{plus} -{minus}).",
+    let mut summary = format!(
+        "{} {} (+{plus} -{minus}).",
+        if dry_run {
+            "dry run, nothing written. would patch"
+        } else {
+            "patched"
+        },
         text::plural(patches.len(), "file")
-    ));
+    );
+    let ws = text::trailing_ws(&added);
+    if ws > 0 {
+        summary.push_str(&format!(" note: {ws} added line(s) end in whitespace."));
+    }
+    r.summary = Summary::plain(summary);
     r.data = json!({
         "files": patches.len(),
         "added": plus,
