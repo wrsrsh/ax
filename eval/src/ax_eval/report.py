@@ -133,7 +133,35 @@ def _ok_adoption(v) -> bool:
 
 
 CHECKS = {"setups": _ok_setups, "guardrail": lambda v: v is not None, "ratios": _ok_ratios, "adoption": _ok_adoption}
-ALIASES = {"setups": ["setups", "pass_rates", "pass_rate"], "ratios": ["ratios", "ratio"], "guardrail": ["guardrail"], "adoption": ["adoption"]}
+
+
+def from_stats(real: dict, fb: dict) -> dict:
+    """reshape ax_eval.stats.summary output into the sections the renderer reads."""
+    out = {}
+    pr = real.get("pass_rate") or {}
+    out["setups"] = {
+        s: {**fb["setups"].get(s, {}), "pass_rate": v["rate"], "ci": (v["lo"], v["hi"])}
+        for s, v in pr.items() if v.get("rate") is not None
+    }
+    out["guardrail"] = {}
+    for pair, v in (real.get("pass_rate_diff") or {}).items():
+        b, a = pair.split("-")
+        if a != BASE or v.get("diff") is None:
+            continue
+        ci = (v["lo"], v["hi"])
+        out["guardrail"][b] = {"diff": v["diff"], "ci": ci, "margin": MARGIN, "tasks": None, "ok": ci[0] >= -MARGIN}
+    out["ratios"] = {}
+    for metric, pairs in (real.get("ratios") or {}).items():
+        for pair, v in pairs.items():
+            if not pair.endswith(f"/{BASE}") or v.get("median") is None:
+                continue
+            out["ratios"].setdefault(pair, {})[metric] = {"median": v["median"], "ci": (v["lo"], v["hi"]), "n": v.get("n_tasks")}
+    out["adoption"] = {
+        s: {**fb["adoption"].get(s, {}), "runs": v["n_runs"], "adoption": v["share_runs_with_ax"],
+            "used_ax": round(v["share_runs_with_ax"] * v["n_runs"]), "fallback_rate": v.get("mean_fallback_rate")}
+        for s, v in (real.get("adoption") or {}).items()
+    }
+    return out
 
 
 def summary(rows: list[dict]) -> tuple[dict, str]:
@@ -143,12 +171,12 @@ def summary(rows: list[dict]) -> tuple[dict, str]:
     except ImportError:
         return fb, "built-in fallback (ax_eval.stats not installed)"
     try:
-        real = stats.summary(rows)
+        real = from_stats(stats.summary(rows), fb)
     except Exception as e:  # noqa: BLE001 - a broken stats module shouldn't block the report
         return fb, f"built-in fallback (ax_eval.stats.summary failed: {e!r})"
     out, fell = dict(fb), []
     for key, check in CHECKS.items():
-        v = next((real[a] for a in ALIASES[key] if isinstance(real, dict) and a in real), None)
+        v = real.get(key)
         if check(v):
             out[key] = v
         else:

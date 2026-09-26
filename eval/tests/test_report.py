@@ -140,17 +140,15 @@ def test_helpers():
     assert verdict_metric(None)[0] == "unknown"
 
 
-def test_summary_uses_stats_when_shaped_right(monkeypatch):
-    import sys
-    import types
-
-    rows = [{"setup": "A", "task_id": "t", "resolved": True, "tokens": 1, "cost": 1, "turns": 1, "wall_seconds": 1}]
-    fake = types.ModuleType("ax_eval.stats")
-    fake.summary = lambda rows: {"setups": {"A": {"pass_rate": 0.9, "ci": [0.8, 1.0]}}, "ratios": "weird"}
-    monkeypatch.setitem(sys.modules, "ax_eval.stats", fake)
-    import ax_eval
-
-    monkeypatch.setattr(ax_eval, "stats", fake, raising=False)
+def test_summary_uses_the_real_stats_module():
+    rows = []
+    for t in ("t1", "t2", "t3"):
+        for setup, tok in (("A", 100), ("B", 70)):
+            rows.append({"task_id": t, "setup": setup, "rep": 0, "resolved": True, "input_tokens": tok, "cached_input_tokens": 0,
+                         "output_tokens": 0, "tokens": tok, "cost": tok / 100, "turns": 4, "wall_seconds": 8.0, "infra_failure": False})
     s, src = report.summary(rows)
-    assert s["setups"]["A"]["pass_rate"] == 0.9
-    assert s["ratios"] == {} and "ratios" in src.split("fallback for")[1]
+    assert src == "ax_eval.stats.summary", src
+    assert s["setups"]["B"]["pass_rate"] == 1.0 and s["setups"]["B"]["ci"] == (1.0, 1.0)
+    assert abs(s["ratios"]["B/A"]["tokens"]["median"] - 0.7) < 1e-9
+    assert s["guardrail"]["B"]["ok"] is True
+    assert s["adoption"]["A"]["runs"] == 3
