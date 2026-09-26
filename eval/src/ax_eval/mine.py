@@ -88,8 +88,9 @@ def mine(repo_name: str, slug: str, since: str, limit: int) -> tuple[list[dict],
         if not why:
             try:
                 base = git(d, "rev-parse", f"{commit}^").strip()
+                git(d, "merge-base", "--is-ancestor", commit, "origin/main")
             except subprocess.CalledProcessError:
-                why = "commit not in local clone"
+                why = "not on main"
         if why:
             reasons[why] = reasons.get(why, 0) + 1
             continue
