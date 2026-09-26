@@ -100,6 +100,7 @@ pub fn run(ctx: &Ctx, a: &GrepArgs) -> Result<Report> {
 
     // (rel, abs, lines)
     let mut per_file: Vec<(String, std::path::PathBuf, Collect)> = Vec::new();
+    let mut binary_skipped = 0;
     for e in files {
         let mut sink = Collect::default();
         if searcher.search_path(&matcher, &e.abs, &mut sink).is_err() {
@@ -107,6 +108,8 @@ pub fn run(ctx: &Ctx, a: &GrepArgs) -> Result<Report> {
         }
         if sink.matches > 0 {
             per_file.push((e.rel, e.abs, sink));
+        } else if sink.binary {
+            binary_skipped += 1;
         }
     }
     let total_hits: usize = per_file.iter().map(|(_, _, c)| c.matches).sum();
@@ -212,6 +215,12 @@ pub fn run(ctx: &Ctx, a: &GrepArgs) -> Result<Report> {
                 " (hidden + gitignored skipped; --all searches them)"
             }
         );
+    }
+    if binary_skipped > 0 {
+        r.summary.text.push_str(&format!(
+            " skipped {} (not searched, like rg).",
+            crate::text::plural(binary_skipped, "binary file")
+        ));
     }
     Ok(r)
 }

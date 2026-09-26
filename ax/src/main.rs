@@ -245,7 +245,7 @@ fn main() {
             let out = if cli.json {
                 report.render_json()
             } else {
-                report.render_text()
+                report.render_text(ax::config::Config::from_env().byte_cap())
             };
             (out, i32::from(report.failed), report.data, false)
         }

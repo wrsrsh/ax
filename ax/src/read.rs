@@ -65,6 +65,12 @@ struct Out {
     cut: Vec<String>,
 }
 
+impl Out {
+    fn bytes(&self) -> usize {
+        self.lines.iter().map(|l| l.len() + 1).sum()
+    }
+}
+
 fn outline_of(rel: &str, src: &[u8]) -> Vec<Symbol> {
     let Some(lang) = Lang::from_path(rel) else {
         return Vec::new();
@@ -86,29 +92,34 @@ fn emit(
     let all = text::lines(src);
     let n = all.len();
     let end = end.min(n);
-    let budget_left = CALL_BUDGET.saturating_sub(o.printed);
     let want = end + 1 - start.min(end + 1);
-    let take = if ctx.cfg.caps {
-        want.min(budget_left)
-    } else {
-        want
-    };
-    let stop = start + take.saturating_sub(1);
+    // lines first, then bytes: leave room for headers, notes and the summary
+    let lines_left = CALL_BUDGET.saturating_sub(o.printed);
+    let bytes_left = ctx.cfg.max_bytes.saturating_sub(o.bytes() + 2_000);
     let mut rows = Vec::new();
-    for (i, l) in all.iter().enumerate().take(stop).skip(start - 1) {
-        o.lines.push(anchored(&ctx.cfg, i + 1, l));
+    let mut used = 0;
+    let mut stop = start.saturating_sub(1);
+    for (i, l) in all.iter().enumerate().take(end).skip(start - 1) {
+        let line = anchored(&ctx.cfg, i + 1, l);
+        if ctx.cfg.caps && (rows.len() >= lines_left || used + line.len() + 1 > bytes_left) {
+            break;
+        }
+        used += line.len() + 1;
+        o.lines.push(line);
         rows.push(json!({
             "line": i + 1,
             "anchor": anchor(i + 1, l),
             "text": String::from_utf8_lossy(hash::strip_eol(l)),
         }));
+        stop = i + 1;
     }
+    let take = rows.len();
     o.printed += rows.len();
     let mut note = why;
     if take < want {
         o.cut.push(rel.to_string());
         note = Some(format!(
-            "… stopped at line {stop} (call budget of {CALL_BUDGET} lines). continue with `ax read {rel}:{}-`",
+            "… stopped at line {stop} (per-call output budget). continue with `ax read {rel}:{}-`",
             stop + 1
         ));
     }
@@ -299,7 +310,7 @@ pub fn run(ctx: &Ctx, paths: &[String], sym: Option<&str>, full: bool) -> Result
         text.push_str(&format!(" failed: {}.", o.failed.join(", ")));
     }
     if !o.cut.is_empty() {
-        text.push_str(" hit the per-call line budget; read fewer files at once.");
+        text.push_str(" hit the per-call output budget; read fewer files or smaller ranges.");
     }
     r.summary = Summary {
         total: files_read,

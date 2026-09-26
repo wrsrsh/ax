@@ -10,6 +10,7 @@
 //! | AX_MAX_HITS=n        | 50      | grep/find/refs hit cap                  |
 //! | AX_READ_WINDOW=n     | 200     | lines per read window                   |
 //! | AX_LONG_FILE=n       | 300     | files longer than this get an outline   |
+//! | AX_MAX_BYTES=n       | 24000   | text output cap per call (~7k tokens)   |
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Config {
@@ -21,6 +22,7 @@ pub struct Config {
     pub max_hits: usize,
     pub read_window: usize,
     pub long_file: usize,
+    pub max_bytes: usize,
 }
 
 impl Default for Config {
@@ -34,6 +36,7 @@ impl Default for Config {
             max_hits: 50,
             read_window: 200,
             long_file: 300,
+            max_bytes: 24_000,
         }
     }
 }
@@ -61,12 +64,17 @@ impl Config {
             max_hits: num("AX_MAX_HITS", d.max_hits),
             read_window: num("AX_READ_WINDOW", d.read_window),
             long_file: num("AX_LONG_FILE", d.long_file),
+            max_bytes: num("AX_MAX_BYTES", d.max_bytes),
         }
     }
 
     /// the hit cap to apply, or None when caps are off.
     pub fn hit_cap(&self) -> Option<usize> {
         self.caps.then_some(self.max_hits)
+    }
+
+    pub fn byte_cap(&self) -> Option<usize> {
+        self.caps.then_some(self.max_bytes)
     }
 }
 

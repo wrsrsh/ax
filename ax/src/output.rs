@@ -121,13 +121,29 @@ impl Report {
         }
     }
 
-    pub fn render_text(&self) -> String {
+    /// text output, cut at line boundaries to stay under `max_bytes` so an
+    /// agent harness never has to truncate it for us (and silently).
+    pub fn render_text(&self, max_bytes: Option<usize>) -> String {
+        let summary_len = self.summary.text.len() + 120;
+        let budget = max_bytes.map(|m| m.saturating_sub(summary_len));
         let mut s = String::new();
+        let mut shown = 0;
         for l in &self.lines {
+            if budget.is_some_and(|b| s.len() + l.len() + 1 > b) {
+                break;
+            }
             s.push_str(l);
             s.push('\n');
+            shown += 1;
         }
         s.push_str(&self.summary.text);
+        if shown < self.lines.len() {
+            s.push_str(&format!(
+                " output cut at {} bytes (AX_MAX_BYTES): {} more lines not shown, narrow the call.",
+                max_bytes.unwrap_or(0),
+                self.lines.len() - shown
+            ));
+        }
         s.push('\n');
         s
     }
@@ -196,12 +212,26 @@ mod tests {
     }
 
     #[test]
+    fn text_is_cut_at_the_byte_budget() {
+        let mut r = Report::new("read");
+        r.lines = (0..100)
+            .map(|i| format!("line {i:03} {}", "x".repeat(40)))
+            .collect();
+        r.summary = Summary::plain("read 1 file.");
+        let t = r.render_text(Some(1000));
+        assert!(t.len() <= 1000 + 200, "{}", t.len());
+        assert!(t.trim_end().ends_with("narrow the call."), "{t}");
+        assert!(t.contains("more lines not shown"));
+        assert_eq!(r.render_text(None).lines().count(), 101);
+    }
+
+    #[test]
     fn report_renders_both_ways() {
         let mut r = Report::new("grep");
         r.lines.push("src/a.rs".into());
         r.data = serde_json::json!({"hits": []});
         r.summary = Summary::counted("hit", 0, 0, "", "");
-        assert_eq!(r.render_text(), "src/a.rs\nno hits.\n");
+        assert_eq!(r.render_text(None), "src/a.rs\nno hits.\n");
         let v: Value = serde_json::from_str(&r.render_json()).unwrap();
         assert_eq!(v["command"], "grep");
         assert_eq!(v["summary"]["text"], "no hits.");
