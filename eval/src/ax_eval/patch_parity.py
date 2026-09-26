@@ -16,9 +16,11 @@ import subprocess
 import sys
 from pathlib import Path
 
-from ax_eval.parity import REPORT, REPOS, ROOT, checkout
+from ax_eval.parity import REPOS, checkout
+from ax_eval.util import REPORT, ROOT
 
 
+# bytes on purpose: diffs go to git apply and ax patch exactly as git printed them
 def git(d: Path, *args: str, input: bytes | None = None, check: bool = True) -> subprocess.CompletedProcess:
     return subprocess.run(["git", *args], cwd=d, input=input, capture_output=True, check=check)
 
@@ -29,12 +31,11 @@ def to_codex(diff: str) -> str:
     files = diff.split("\ndiff --git ")
     for i, f in enumerate(files):
         body = f if i == 0 else "diff --git " + f
-        lines = body.splitlines()
         src = dst = None
         rename_from = rename_to = None
         hunks: list[str] = []
         in_hunk = False
-        for l in lines:
+        for l in body.splitlines():
             if l.startswith("rename from "):
                 rename_from = l[12:]
             elif l.startswith("rename to "):
@@ -48,8 +49,6 @@ def to_codex(diff: str) -> str:
                 hunks.append("@@")
             elif in_hunk and l[:1] in (" ", "+", "-"):
                 hunks.append(l)
-            elif in_hunk and l.startswith("\\"):
-                continue
         if src is None and dst is not None:
             out.append(f"*** Add File: {dst}")
             out += [h for h in hunks if h.startswith("+")]

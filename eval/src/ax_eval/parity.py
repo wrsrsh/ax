@@ -14,16 +14,16 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-EVAL = Path(__file__).resolve().parents[2]
-ROOT = EVAL.parent
+from ax_eval.util import EVAL, REPORT, ROOT
+
 CACHE = EVAL / ".cache" / "parity-repos"
-REPORT = EVAL / "report"
 
 
 @dataclass(frozen=True)
@@ -183,7 +183,6 @@ def run_bench(ax_bin: Path, repos: list[Repo], out_dir: Path) -> list[dict]:
         for label, ax_args, rg_args in BENCH:
             slug = f"{repo.name}-{label.replace(' ', '-')}"
             export = out_dir / f"{slug}.json"
-            q = lambda a: " ".join(f"'{x}'" for x in a)  # noqa: E731
             sh(
                 [
                     hf,
@@ -191,8 +190,8 @@ def run_bench(ax_bin: Path, repos: list[Repo], out_dir: Path) -> list[dict]:
                     "--min-runs", "10",
                     "--style", "none",
                     "--export-json", str(export),
-                    "-n", "ax", f"{ax_bin} {q(ax_args)} > /dev/null",
-                    "-n", "rg", f"rg {q(rg_args)} . < /dev/null > /dev/null",
+                    "-n", "ax", f"{ax_bin} {shlex.join(ax_args)} > /dev/null",
+                    "-n", "rg", f"rg {shlex.join(rg_args)} . < /dev/null > /dev/null",
                 ],
                 d,
                 check=True,

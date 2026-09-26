@@ -16,17 +16,14 @@ import sys
 import time
 from pathlib import Path
 
-from ax_eval.mine import TASKS
+from ax_eval.util import TASKS
 from ax_eval.validate import run_tests
 
 
 def patch_paths(patch: str) -> list[str]:
-    """files a unified diff touches (both sides, minus /dev/null)."""
-    paths = set()
-    for m in re.finditer(r"^(?:---|\+\+\+) (?:[ab]/)?(\S+)", patch, re.M):
-        if m.group(1) != "/dev/null":
-            paths.add(m.group(1))
-    return sorted(paths)
+    """files a unified diff touches, both sides."""
+    paths = set(re.findall(r"^(?:---|\+\+\+) (?:[ab]/)?(\S+)", patch, re.M))
+    return sorted(paths - {"/dev/null"})
 
 
 def load_task(task_id: str) -> dict:
@@ -48,15 +45,15 @@ def summarize(task: dict, results: dict[str, str] | str, seconds: float) -> dict
             "f2p_passed": 0, "f2p_total": len(f2p), "p2p_passed": 0, "p2p_total": len(p2p),
             "failing": [], "grade_seconds": round(seconds, 1),
         }
-    ok = lambda t: results.get(t) == "passed"  # noqa: E731
-    failing = [t for t in f2p + p2p if not ok(t)]
+    passed = {t for t, status in results.items() if status == "passed"}
+    failing = [t for t in f2p + p2p if t not in passed]
     return {
         "task": task["id"],
         "resolved": not failing,
         "error": None,
-        "f2p_passed": sum(map(ok, f2p)),
+        "f2p_passed": sum(t in passed for t in f2p),
         "f2p_total": len(f2p),
-        "p2p_passed": sum(map(ok, p2p)),
+        "p2p_passed": sum(t in passed for t in p2p),
         "p2p_total": len(p2p),
         "failing": failing[:20],
         "grade_seconds": round(seconds, 1),

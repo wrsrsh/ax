@@ -14,17 +14,14 @@ import json
 import re
 import subprocess
 import sys
-from pathlib import Path
+from collections import Counter
 
-from ax_eval.parity import EVAL, REPOS, checkout
-
-TASKS = EVAL / "tasks"
+from ax_eval.parity import REPOS, checkout
+from ax_eval.util import TASKS, git, sh
 
 TEST_RE = re.compile(r"(^|/)(tests?|__tests__|runtime-tests)/|\.(test|spec)\.[cm]?[jt]sx?$|(^|/)test_[^/]*\.py$|_test\.(py|go)$")
 SOURCE_RE = re.compile(r"\.(ts|tsx|mts|cts|js|jsx|mjs|cjs|py|rs|go)$")
-EXCLUDED_RE = re.compile(
-    r"(^|/)(docs?|benchmarks?|perf-measures|examples?|\.github)/|(^|/)(package\.json|jsr\.json|deno\.json|pnpm-lock\.yaml|package-lock\.json|yarn\.lock|bun\.lockb?)$|\.config\.[cm]?[jt]s$|\.d\.ts$"
-)
+EXCLUDED_RE = re.compile(r"(^|/)(docs?|benchmarks?|perf-measures|examples?|\.github)/|(^|/)(jsr|deno)\.json$|\.config\.[cm]?[jt]s$|\.d\.ts$")
 DEPENDENCY_RE = re.compile(r"(^|/)(package\.json|pnpm-lock\.yaml|package-lock\.json|yarn\.lock|bun\.lockb?|Cargo\.lock|go\.sum|uv\.lock)$")
 BOTS = re.compile(r"(\[bot\]$|^app/|bot$|renovate|dependabot)", re.I)
 
@@ -55,15 +52,10 @@ def qualifies(files: list[str]) -> tuple[bool, str]:
 
 
 def gh_json(args: list[str]) -> list | dict:
-    out = subprocess.run(["gh", *args], capture_output=True, check=True, text=True).stdout
-    return json.loads(out)
+    return json.loads(sh("gh", *args).stdout)
 
 
-def git(d: Path, *args: str) -> str:
-    return subprocess.run(["git", *args], cwd=d, capture_output=True, check=True, text=True).stdout
-
-
-def mine(repo_name: str, slug: str, since: str, limit: int) -> tuple[list[dict], dict[str, int]]:
+def mine(repo_name: str, slug: str, since: str, limit: int) -> tuple[list[dict], Counter[str]]:
     d = checkout(next(r for r in REPOS if r.name == repo_name))
     prs = gh_json(
         [
@@ -72,7 +64,7 @@ def mine(repo_name: str, slug: str, since: str, limit: int) -> tuple[list[dict],
             "--json", "number,title,body,author,mergeCommit,mergedAt,files,closingIssuesReferences",
         ]
     )
-    reasons: dict[str, int] = {}
+    reasons: Counter[str] = Counter()
     out = []
     for pr in sorted(prs, key=lambda p: p["mergedAt"]):
         why = ""
@@ -84,7 +76,7 @@ def mine(repo_name: str, slug: str, since: str, limit: int) -> tuple[list[dict],
         elif not commit:
             why = "no merge commit"
         else:
-            ok, why = qualifies(files)
+            _, why = qualifies(files)
         if not why:
             try:
                 base = git(d, "rev-parse", f"{commit}^").strip()
@@ -92,15 +84,14 @@ def mine(repo_name: str, slug: str, since: str, limit: int) -> tuple[list[dict],
             except subprocess.CalledProcessError:
                 why = "not on main"
         if why:
-            reasons[why] = reasons.get(why, 0) + 1
+            reasons[why] += 1
             continue
         src = [f for f in files if classify(f) == "source"]
         tests = [f for f in files if classify(f) == "test"]
         issues = []
         for ref in pr.get("closingIssuesReferences") or []:
             try:
-                i = gh_json(["issue", "view", str(ref["number"]), "-R", slug, "--json", "number,title,body"])
-                issues.append(i)
+                issues.append(gh_json(["issue", "view", str(ref["number"]), "-R", slug, "--json", "number,title,body"]))
             except subprocess.CalledProcessError:
                 pass
         out.append(

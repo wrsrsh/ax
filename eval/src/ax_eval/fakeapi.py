@@ -47,18 +47,19 @@ def item_for(step: str) -> dict:
     kind, _, arg = step.partition(":")
     n = next(_ids)
     if kind == "patch":
-        js = f"text(await tools.apply_patch({json.dumps(arg.replace(chr(92) + 'n', chr(10)))}));"
-        return {"type": "custom_tool_call", "id": f"ctc_{n}", "call_id": f"call_{n}", "name": "exec", "input": js, "status": "completed"}
-    if kind == "sh":
+        patch = arg.replace("\\n", "\n")
+        js = f"text(await tools.apply_patch({json.dumps(patch)}));"
+    elif kind == "sh":
         js = f"const r = await tools.exec_command({{cmd: {json.dumps(arg)}}});\ntext(r.output ?? JSON.stringify(r));"
-        return {"type": "custom_tool_call", "id": f"ctc_{n}", "call_id": f"call_{n}", "name": "exec", "input": js, "status": "completed"}
-    return {
-        "type": "message",
-        "id": f"msg_{n}",
-        "role": "assistant",
-        "status": "completed",
-        "content": [{"type": "output_text", "text": arg or "done", "annotations": []}],
-    }
+    else:
+        return {
+            "type": "message",
+            "id": f"msg_{n}",
+            "role": "assistant",
+            "status": "completed",
+            "content": [{"type": "output_text", "text": arg or "done", "annotations": []}],
+        }
+    return {"type": "custom_tool_call", "id": f"ctc_{n}", "call_id": f"call_{n}", "name": "exec", "input": js, "status": "completed"}
 
 
 def sse(script: Script) -> bytes:
@@ -122,9 +123,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--port", type=int, default=18555)
     p.add_argument("--host", default="127.0.0.1")
     p.add_argument("--record", type=Path)
-    p.add_argument("--step", action="append", default=[], help="sh:<command> or msg:<text>")
+    p.add_argument("--step", action="append", default=[], help="sh:<command>, patch:<patch> or msg:<text>")
     a = p.parse_args(argv)
-    srv, port = serve(Script(a.step or ["msg:done"], a.record), a.port, a.host)
+    _, port = serve(Script(a.step or ["msg:done"], a.record), a.port, a.host)
     print(f"fake responses api on http://{a.host}:{port}/v1", flush=True)
     threading.Event().wait()
     return 0

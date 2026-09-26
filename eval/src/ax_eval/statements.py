@@ -17,7 +17,7 @@ import random
 import re
 import sys
 
-from ax_eval.mine import TASKS
+from ax_eval.util import TASKS
 
 THIN = 200
 MAX_TASKS = 50
@@ -98,14 +98,12 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--seed", type=int, default=7)
     p.add_argument("--max", type=int, default=MAX_TASKS)
     a = p.parse_args(argv)
-    tasks = [json.loads(l) for l in open(TASKS / "tasks.jsonl")]
+    tasks = [json.loads(l) for l in (TASKS / "tasks.jsonl").read_text().splitlines()]
     rng = random.Random(a.seed)
     if len(tasks) > a.max:
         tasks = sorted(rng.sample(tasks, a.max), key=lambda t: t["id"])
-    rewrites = {}
     rw = TASKS / "rewrites.json"
-    if rw.exists():
-        rewrites = json.loads(rw.read_text())
+    rewrites = json.loads(rw.read_text()) if rw.exists() else {}
     sets = split(tasks, a.dev, a.seed)
     flagged = []
     with open(TASKS / "final.jsonl", "w") as f:
@@ -114,9 +112,8 @@ def main(argv: list[str] | None = None) -> int:
             reasons = []
             if len(text) < THIN:
                 reasons.append("thin")
-            lk = leaks(text, t)
-            if lk:
-                reasons.append("names " + ", ".join(lk[:5]))
+            if named := leaks(text, t):
+                reasons.append("names " + ", ".join(named[:5]))
             rec = {
                 "id": t["id"],
                 "set": sets[t["id"]],
