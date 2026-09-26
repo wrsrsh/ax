@@ -1,0 +1,17 @@
+notes on rewrites.part1.json, one line per task
+
+- hono-4988: dropped the file path, line numbers, "root cause" and the try/finally fix; kept the v4.12.23 version, the repro and the error text. added "a second pipe() works" from the new test.
+- hono-5062: dropped the file:line anchors, "truthiness check" and the `!== null` fix; kept the `getContent: async () => ''` repro and the list of other empty payloads. expected result (200, empty body, onNotFound not called) comes from the test.
+- hono-5067: dropped the file:line anchors and the lowercasing/regex fix; kept the Application/JSON repro. added the multipart boundary requirement and the charset=UTF-8 urlencoded case from the tests.
+- hono-5084: dropped the internal matcher function and its source; kept the RFC 9110 ref, the curl repro and the version. added the PUT/201 and 404 exceptions from the new test (they're not in the original).
+- hono-5092: dropped the github source links and the internal merge helper name; kept the version, runtime and repro. added the three combos plus "per-request wins on conflict" from the tests.
+- hono-5099: dropped the source link and the line-level fix hint; kept the compress() symptom. added "any non-identity encoding such as zstd -> base64; identity -> plain text" from the tests.
+- hono-5102: dropped the root-cause paragraph and the suggested fix (it named private fields/methods); kept the TrieRouter repro and the matrix. added the /regex-abc/123 sibling case, which is the actual fail-to-pass test.
+- hono-5135: original was only a PR title (thin). inferred the behaviour from the test: writeSSE({ retry: 0 }) must emit `retry: 0`. mentioned that the existing CR/LF check on event/id should keep working.
+- hono-5171: rewrote a PR description as a request; dropped the benchmarks, bundle size and all internal structure. listed the conflicting route pairs from the fail-to-pass tests, plus the /w/*/x + /w/:id/y param capture case. avoided the internal data structure's name.
+- hono-5199: dropped the source link and the "incremental hashing" code detail (kept one sentence on the symptom); trimmed the curl output down to the two etags. added the exact expected sha-1 for 'Hono ' + 'is hot' from the test. avoided "chunk"/"digest" since they're identifiers in the diff.
+- hono-5205: original was only a PR title (thin). inferred from the test: 1MB stream in one piece vs split 1/32768/967231 must give the same etag. deliberately didn't require plain sha-1 of the whole body (5199's test does; this one only checks equality). avoided "chunk"/"digest".
+- hono-5202: rewrote the PR summary as a bug report; dropped the file names and lint/test commands and didn't name the internal serializer. kept the before/after header values.
+- hono-5209: dropped the internal function name, the file path and the regex-literal fix; described it through the route API (`app.get('/api/:id{[0-9]?}?')`) and the expected expansion to `/api` + `/api/:id{[0-9]?}`. the fail-to-pass test calls the internal helper directly, so the agent has to find it.
+
+self-check (scratchpad check.py): none of the statements contain a src basename with its extension, a src path, or line refs. stem hits are all public api or plain words (stream -> `stream()`/hono/streaming, validator -> `validator()`, client -> rpc client, sse -> `streamSSE`, router -> RegExpRouter, body -> english). gold-patch identifier hits were all english words or public api (headers, retry, match, UnsupportedPathError, Uint8Array...). "writer" in 4988 only shows up inside the quoted platform error text.
