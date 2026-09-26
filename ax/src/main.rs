@@ -104,7 +104,12 @@ enum Cmd {
     /// apply anchored edit ops from stdin
     Edit { path: String },
     /// write a whole file from stdin
-    Write { path: String },
+    Write {
+        path: String,
+        /// only if the file still has this hash (from `ax read`)
+        #[arg(long = "if")]
+        if_hash: Option<String>,
+    },
     /// apply a multi-file patch from stdin
     Patch,
     /// git status + stat + capped hunks
@@ -117,6 +122,13 @@ enum Cmd {
     },
     /// print the usage note for CLAUDE.md / AGENTS.md
     AgentHelp,
+}
+
+fn stdin() -> ax::Result<Vec<u8>> {
+    use std::io::Read;
+    let mut input = Vec::new();
+    std::io::stdin().read_to_end(&mut input)?;
+    Ok(input)
 }
 
 fn run(ctx: &Ctx, cmd: Cmd) -> ax::Result<Report> {
@@ -179,14 +191,11 @@ fn run(ctx: &Ctx, cmd: Cmd) -> ax::Result<Report> {
         Cmd::Read { paths, sym, full } => {
             return ax::read::run(ctx, &paths, sym.as_deref(), full);
         }
-        Cmd::Edit { path } => {
-            use std::io::Read;
-            let mut input = Vec::new();
-            std::io::stdin().read_to_end(&mut input)?;
-            return ax::edit::run(ctx, &path, &input);
+        Cmd::Edit { path } => return ax::edit::run(ctx, &path, &stdin()?),
+        Cmd::Write { path, if_hash } => {
+            return ax::write::run(ctx, &path, if_hash.as_deref(), &stdin()?);
         }
-        Cmd::Write { .. } => "write",
-        Cmd::Patch => "patch",
+        Cmd::Patch => return ax::patch::run(ctx, &stdin()?),
         Cmd::Diff { full, paths } => return ax::diff::run(ctx, full, &paths),
         Cmd::AgentHelp => "agent-help",
     };

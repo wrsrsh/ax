@@ -8,12 +8,14 @@ pub mod hash;
 pub mod hits;
 pub mod map;
 pub mod output;
+pub mod patch;
 pub mod read;
 pub mod repo;
 pub mod symbols;
 pub mod syntax;
 pub mod text;
 pub mod walk;
+pub mod write;
 
 use std::path::PathBuf;
 
