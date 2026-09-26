@@ -104,13 +104,13 @@ def test_report_renders(fake):
     root, runs, tasks = fake
     rows = collect(runs, root / "report", tasks)
     out = root / "report" / "REPORT.md"
-    md = render(rows, runs, out, tasks)
+    md = render(rows, runs, out, tasks, subset=None)
     assert out.read_text() == md
     for h in ["# ax eval report", "## summary", "## guardrail", "## ratios vs baseline", "## adoption",
               "## wins and losses", "## verdict", "## limitations"]:
         assert h in md, h
     assert "codex 0.156.0" in md and "gpt-6-astra, effort medium" in md and "abc1234" in md
-    assert "5 in final.jsonl (1 dev, 4 held-out); 3 with usable runs here" in md
+    assert "5 in final.jsonl (1 dev, 4 held-out); 4 with usable runs here" in md
     assert "26 real (0 dry runs ignored), 24 usable" in md
     assert "1 infra failures, 1 incomplete" in md
     assert "| A | 8 | 4 | 50.0% |" in md and "| B | 8 | 4 | 75.0% |" in md
@@ -122,6 +122,9 @@ def test_report_renders(fake):
     assert "tokens: helped" in verdict and "cost: helped" in verdict
     assert verdict.count("no measurable difference") >= 5  # every C metric + B pass rate
     assert "stats: built-in fallback." in md
+    # the default report is the held-out split only
+    held = render(rows, runs, out, tasks)
+    assert "3 with usable runs here" in held and "(heldout split)" in held
 
 
 def test_cli(fake, monkeypatch):
