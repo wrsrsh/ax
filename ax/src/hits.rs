@@ -12,7 +12,7 @@
 
 use crate::config::Config;
 use crate::output::{anchor, anchored};
-use crate::syntax::{self, Lang, Symbol};
+use crate::syntax::{self, Symbol};
 use serde::Serialize;
 use serde_json::{Value, json};
 
@@ -44,12 +44,7 @@ pub fn symbols_for(cfg: &Config, rel: &str, src: &[u8]) -> Vec<Symbol> {
     if !cfg.symbols {
         return Vec::new();
     }
-    let Some(lang) = Lang::from_path(rel) else {
-        return Vec::new();
-    };
-    syntax::parse(lang, src)
-        .map(|t| syntax::symbols(lang, &t, src))
-        .unwrap_or_default()
+    syntax::file_symbols(rel, src)
 }
 
 /// with context lines around, match lines get a `>` in the gutter so you can

@@ -21,7 +21,6 @@ pub struct WalkOpts {
     pub all: bool,
 }
 
-/// one walked file.
 #[derive(Debug, Clone)]
 pub struct Entry {
     pub abs: PathBuf,

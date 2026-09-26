@@ -40,7 +40,6 @@ pub fn run(ctx: &Ctx, full: bool, paths: &[String]) -> Result<Report> {
         .iter()
         .map(|p| crate::repo::rel(root, &crate::repo::absolute(&ctx.cwd, p.as_ref())))
         .collect();
-    let paths = paths.as_slice();
     if git(root, &["rev-parse", "--is-inside-work-tree"]).is_err() {
         return Err(AxError("not a git repo, nothing to diff".into()));
     }
@@ -49,16 +48,12 @@ pub fn run(ctx: &Ctx, full: bool, paths: &[String]) -> Result<Report> {
         .map(|b| b.trim().to_string())
         .unwrap_or_else(|_| "(no commits yet)".into());
 
-    let with_paths = |mut v: Vec<&'static str>| -> Vec<String> {
-        let mut out: Vec<String> = v.drain(..).map(String::from).collect();
+    let git_paths = |args: &[&str]| {
+        let mut a: Vec<&str> = args.to_vec();
         if !paths.is_empty() {
-            out.push("--".into());
-            out.extend(paths.iter().cloned());
+            a.push("--");
+            a.extend(paths.iter().map(String::as_str));
         }
-        out
-    };
-    let run_git = |args: Vec<String>| {
-        let a: Vec<&str> = args.iter().map(String::as_str).collect();
         git(root, &a)
     };
 
@@ -68,27 +63,21 @@ pub fn run(ctx: &Ctx, full: bool, paths: &[String]) -> Result<Report> {
     } else {
         "4b825dc642cb6eb9a060e54bf8d69288fbee4904" // git's empty tree
     };
-    let numstat = run_git(with_paths(vec!["diff", base, "--numstat", "--no-renames"]))?;
-    let status = run_git(with_paths(vec![
-        "status",
-        "--porcelain=v1",
-        "-uall",
-        "--no-renames",
-    ]))?;
-    let patch = run_git(with_paths(vec![
+    let numstat = git_paths(&["diff", base, "--numstat", "--no-renames"])?;
+    let status = git_paths(&["status", "--porcelain=v1", "-uall", "--no-renames"])?;
+    let patch = git_paths(&[
         "diff",
         base,
         "--no-color",
         "--no-ext-diff",
         "--no-renames",
         "-U3",
-    ]))?;
+    ])?;
 
     let mut counts = std::collections::HashMap::new();
     for l in numstat.lines() {
         let mut it = l.splitn(3, '\t');
-        let (a, r, p) = (it.next(), it.next(), it.next());
-        if let (Some(a), Some(r), Some(p)) = (a, r, p) {
+        if let (Some(a), Some(r), Some(p)) = (it.next(), it.next(), it.next()) {
             counts.insert(p.to_string(), (a.parse().ok(), r.parse().ok()));
         }
     }
@@ -106,7 +95,7 @@ pub fn run(ctx: &Ctx, full: bool, paths: &[String]) -> Result<Report> {
                 .map(|b| text::line_count(&b));
             (n, Some(0))
         } else {
-            counts.get(&p).cloned().unwrap_or((None, None))
+            counts.get(&p).copied().unwrap_or((None, None))
         };
         changes.push(FileChange {
             status: st.trim().to_string(),

@@ -57,6 +57,7 @@ pub fn parse_spec(s: &str) -> Result<Spec> {
     })
 }
 
+#[derive(Default)]
 struct Out {
     lines: Vec<String>,
     files: Vec<Value>,
@@ -71,15 +72,6 @@ impl Out {
     }
 }
 
-fn outline_of(rel: &str, src: &[u8]) -> Vec<Symbol> {
-    let Some(lang) = Lang::from_path(rel) else {
-        return Vec::new();
-    };
-    syntax::parse(lang, src)
-        .map(|t| syntax::symbols(lang, &t, src))
-        .unwrap_or_default()
-}
-
 fn emit(
     ctx: &Ctx,
     o: &mut Out,
@@ -92,13 +84,13 @@ fn emit(
     let all = text::lines(src);
     let n = all.len();
     let end = end.min(n);
-    let want = end + 1 - start.min(end + 1);
+    let want = (end + 1).saturating_sub(start);
     // lines first, then bytes: leave room for headers, notes and the summary
     let lines_left = CALL_BUDGET.saturating_sub(o.printed);
     let bytes_left = ctx.cfg.max_bytes.saturating_sub(o.bytes() + 2_000);
     let mut rows = Vec::new();
     let mut used = 0;
-    let mut stop = start.saturating_sub(1);
+    let mut stop = start - 1;
     for (i, l) in all.iter().enumerate().take(end).skip(start - 1) {
         let line = anchored(&ctx.cfg, i + 1, l);
         if ctx.cfg.caps && (rows.len() >= lines_left || used + line.len() + 1 > bytes_left) {
@@ -113,10 +105,9 @@ fn emit(
         }));
         stop = i + 1;
     }
-    let take = rows.len();
     o.printed += rows.len();
     let mut note = why;
-    if take < want {
+    if rows.len() < want {
         o.cut.push(rel.to_string());
         note = Some(format!(
             "… stopped at line {stop} (per-call output budget). continue with `ax read {rel}:{}-`",
@@ -138,13 +129,7 @@ fn emit(
 }
 
 pub fn run(ctx: &Ctx, paths: &[String], sym: Option<&str>, full: bool) -> Result<Report> {
-    let mut o = Out {
-        lines: Vec::new(),
-        files: Vec::new(),
-        printed: 0,
-        failed: Vec::new(),
-        cut: Vec::new(),
-    };
+    let mut o = Out::default();
     let window = ctx.cfg.read_window;
 
     // --sym with no paths: find it repo-wide
@@ -207,9 +192,9 @@ pub fn run(ctx: &Ctx, paths: &[String], sym: Option<&str>, full: bool) -> Result
         );
 
         if let Some(s) = sym {
-            let found: Vec<Symbol> = outline_of(&rel, &src)
+            let found: Vec<Symbol> = syntax::file_symbols(&rel, &src)
                 .into_iter()
-                .filter(|x| x.path == s || x.name == s || x.path.ends_with(&format!(".{s}")))
+                .filter(|x| x.matches(s))
                 .collect();
             if found.is_empty() {
                 if !paths.is_empty() {
@@ -264,7 +249,7 @@ pub fn run(ctx: &Ctx, paths: &[String], sym: Option<&str>, full: bool) -> Result
                 emit(ctx, &mut o, &rel, &src, 1, n, None);
             }
             None => {
-                let syms: Vec<Symbol> = outline_of(&rel, &src)
+                let syms: Vec<Symbol> = syntax::file_symbols(&rel, &src)
                     .into_iter()
                     .filter(|s| s.depth <= 1)
                     .collect();

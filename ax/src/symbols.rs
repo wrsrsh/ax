@@ -46,19 +46,16 @@ pub fn outline(ctx: &Ctx, path: &str) -> Result<Report> {
 
     if abs.is_file() {
         let rel = repo::rel(&ctx.root, &abs);
-        let Some(lang) = Lang::from_path(&rel) else {
+        if Lang::from_path(&rel).is_none() {
             r.summary = Summary::plain(format!(
                 "no outline for {rel}: not a language ax parses ({SUPPORTED}). use `ax read {rel}`."
             ));
             r.data = json!({ "path": rel, "symbols": [] });
             return Ok(r);
-        };
+        }
         let src = std::fs::read(&abs)?;
-        let syms = syntax::parse(lang, &src)
-            .map(|t| syntax::symbols(lang, &t, &src))
-            .unwrap_or_default();
-        let lines = outline_lines(&syms, usize::MAX);
-        let c = Capped::new(lines, cap);
+        let syms = syntax::file_symbols(&rel, &src);
+        let c = Capped::new(outline_lines(&syms, usize::MAX), cap);
         r.lines.push(format!(
             "{rel}  ({})",
             text::lines_label(text::line_count(&src))
@@ -132,14 +129,10 @@ pub fn outline(ctx: &Ctx, path: &str) -> Result<Report> {
     Ok(r)
 }
 
-fn matches_sym(s: &Symbol, q: &str) -> bool {
-    s.path == q || s.name == q || s.path.ends_with(&format!(".{q}"))
-}
-
 /// `ax def <sym> [--in dir]`: where a symbol is defined. `Hono.fetch` or just
 /// `fetch` both work.
 pub fn def(ctx: &Ctx, sym: &str, within: &[String]) -> Result<Report> {
-    let needle = sym.rsplit('.').next().unwrap_or(sym).as_bytes().to_vec();
+    let needle = sym.rsplit('.').next().unwrap_or(sym).as_bytes();
     let opts = WalkOpts {
         roots: within.to_vec(),
         ..Default::default()
@@ -150,7 +143,7 @@ pub fn def(ctx: &Ctx, sym: &str, within: &[String]) -> Result<Report> {
             continue;
         };
         let Some(src) = read(&e.abs) else { continue };
-        if memchr::memmem::find(&src, &needle).is_none() {
+        if memchr::memmem::find(&src, needle).is_none() {
             continue;
         }
         let Some(tree) = syntax::parse(lang, &src) else {
@@ -158,7 +151,7 @@ pub fn def(ctx: &Ctx, sym: &str, within: &[String]) -> Result<Report> {
         };
         let lines = text::lines(&src);
         for s in syntax::symbols(lang, &tree, &src) {
-            if matches_sym(&s, sym) {
+            if s.matches(sym) {
                 let first = lines
                     .get(s.start - 1)
                     .map(|l| l.to_vec())
