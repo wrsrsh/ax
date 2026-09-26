@@ -42,6 +42,10 @@ impl Dir {
             [] => {}
         }
     }
+
+    fn dir_count(&self) -> usize {
+        self.dirs.len() + self.dirs.values().map(Dir::dir_count).sum::<usize>()
+    }
 }
 
 fn short(s: &str, n: usize) -> String {
@@ -132,15 +136,8 @@ fn stack(dir: &Path, subdirs: &[&String], ext_counts: &BTreeMap<String, usize>) 
             Some(pm) => format!("node ({pm})"),
             None => "node".into(),
         });
-        let deps = |k: &str| {
-            v[k].as_object()
-                .map(|o| o.keys().cloned().collect::<Vec<_>>())
-        };
-        let all: Vec<String> = ["dependencies", "devDependencies"]
-            .iter()
-            .filter_map(|k| deps(k))
-            .flatten()
-            .collect();
+        let has_dep =
+            |t: &str| v["dependencies"].get(t).is_some() || v["devDependencies"].get(t).is_some();
         for t in [
             "typescript",
             "vitest",
@@ -150,7 +147,7 @@ fn stack(dir: &Path, subdirs: &[&String], ext_counts: &BTreeMap<String, usize>) 
             "next",
             "vite-plus",
         ] {
-            if all.iter().any(|d| d == t) {
+            if has_dep(t) {
                 s.push(t.into());
             }
         }
@@ -166,8 +163,9 @@ fn stack(dir: &Path, subdirs: &[&String], ext_counts: &BTreeMap<String, usize>) 
         ("build.gradle", "jvm (gradle)"),
         ("package.json", "node"),
     ];
-    for (f, name) in &MANIFESTS[..8] {
-        if has(f) {
+    for (f, name) in MANIFESTS {
+        // node at the root was already covered above, with more detail
+        if f != "package.json" && has(f) {
             s.push(name.to_string());
         }
     }
@@ -200,8 +198,7 @@ fn tree(root: &Dir, budget: usize) -> Vec<String> {
     for (name, d) in &root.dirs {
         lines.push((format!("  {name}/  {}", d.files), Vec::new()));
     }
-    let dir_lines = lines.len();
-    let room = budget.saturating_sub(dir_lines);
+    let room = budget.saturating_sub(lines.len());
     if root.own_files.len() <= room {
         for f in &root.own_files {
             lines.push((format!("  {f}"), Vec::new()));
@@ -218,16 +215,15 @@ fn tree(root: &Dir, budget: usize) -> Vec<String> {
     }
     // level 2: expand the biggest dirs while budget remains
     let mut used = lines.len();
-    let mut order: Vec<(usize, &String, &Dir)> = root
-        .dirs
-        .iter()
-        .enumerate()
-        .map(|(i, (n, d))| (i, n, d))
-        .collect();
-    order.sort_by_key(|a| std::cmp::Reverse(a.2.files));
-    for (i, _, d) in order {
+    let mut order: Vec<(usize, &Dir)> = root.dirs.values().enumerate().collect();
+    order.sort_by_key(|(_, d)| std::cmp::Reverse(d.files));
+    for (i, d) in order {
         if used >= budget {
             break;
+        }
+        // a dir with only files would just repeat its count
+        if d.dirs.is_empty() {
+            continue;
         }
         let mut kids: Vec<String> = d
             .dirs
@@ -236,9 +232,6 @@ fn tree(root: &Dir, budget: usize) -> Vec<String> {
             .collect();
         if !d.own_files.is_empty() {
             kids.push(format!("    ({} files)", d.own_files.len()));
-        }
-        if kids.len() <= 1 && d.dirs.is_empty() {
-            continue;
         }
         let room = budget - used;
         if kids.len() > room {
@@ -358,7 +351,8 @@ pub fn run(ctx: &Ctx, dir: Option<&str>) -> Result<Report> {
     };
     lines.push(format!("tree ({} files):", files.len()));
     let budget = SCREEN.saturating_sub(lines.len() + dirty_lines + 1).max(8);
-    lines.extend(tree(&t, budget));
+    let tree_lines = tree(&t, budget);
+    lines.extend(tree_lines.iter().cloned());
 
     if !dirty.is_empty() {
         lines.push("dirty:".into());
@@ -370,12 +364,7 @@ pub fn run(ctx: &Ctx, dir: Option<&str>) -> Result<Report> {
         }
     }
 
-    let n_dirs = {
-        fn count(d: &Dir) -> usize {
-            d.dirs.len() + d.dirs.values().map(count).sum::<usize>()
-        }
-        count(&t)
-    };
+    let n_dirs = t.dir_count();
     let mut r = Report::new("map");
     r.summary = Summary::plain(format!(
         "{} files in {n_dirs} dirs. zoom in with `ax map <dir>`, list with `ax find`, peek with `ax outline <dir>`.",
@@ -393,7 +382,7 @@ pub fn run(ctx: &Ctx, dir: Option<&str>) -> Result<Report> {
         "agent_docs": docs,
         "files": files.len(),
         "dirs": n_dirs,
-        "tree": lines.iter().skip_while(|l| !l.starts_with("tree (")).skip(1).take_while(|l| l.starts_with("  ")).cloned().collect::<Vec<_>>(),
+        "tree": tree_lines,
     });
     r.lines = lines;
     Ok(r)

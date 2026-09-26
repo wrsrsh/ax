@@ -61,6 +61,13 @@ pub struct Symbol {
     pub depth: usize,
 }
 
+impl Symbol {
+    /// a query matches the full path, the bare name, or a dotted tail of the path.
+    pub fn matches(&self, q: &str) -> bool {
+        self.path == q || self.name == q || self.path.ends_with(&format!(".{q}"))
+    }
+}
+
 fn text<'a>(n: Node, src: &'a [u8]) -> &'a str {
     std::str::from_utf8(&src[n.byte_range()]).unwrap_or("")
 }
@@ -249,6 +256,16 @@ pub fn symbols(lang: Lang, tree: &Tree, src: &[u8]) -> Vec<Symbol> {
     out
 }
 
+/// symbols in a file, or none if we don't parse its language.
+pub fn file_symbols(rel: &str, src: &[u8]) -> Vec<Symbol> {
+    let Some(lang) = Lang::from_path(rel) else {
+        return Vec::new();
+    };
+    parse(lang, src)
+        .map(|t| symbols(lang, &t, src))
+        .unwrap_or_default()
+}
+
 /// innermost symbol whose range contains `line` (1-based).
 pub fn enclosing(syms: &[Symbol], line: usize) -> Option<&Symbol> {
     syms.iter()
@@ -256,41 +273,27 @@ pub fn enclosing(syms: &[Symbol], line: usize) -> Option<&Symbol> {
         .max_by_key(|s| (s.depth, s.start))
 }
 
-/// ERROR + MISSING nodes in the tree.
-pub fn error_count(tree: &Tree) -> usize {
+/// ERROR + MISSING nodes: how many, and the 1-based line of the first.
+fn errors(tree: &Tree) -> (usize, Option<usize>) {
     let mut n = 0;
+    let mut first: Option<usize> = None;
     let mut stack = vec![tree.root_node()];
     while let Some(node) = stack.pop() {
         if node.is_error() || node.is_missing() {
             n += 1;
+            let l = node.start_position().row + 1;
+            first = Some(first.map_or(l, |f| f.min(l)));
         }
         if node.has_error() {
             let mut c = node.walk();
             stack.extend(node.children(&mut c));
         }
     }
-    n
+    (n, first)
 }
 
 pub fn parse_errors(lang: Lang, src: &[u8]) -> Option<usize> {
-    parse(lang, src).map(|t| error_count(&t))
-}
-
-/// 1-based line of the first ERROR/MISSING node.
-pub fn first_error_line(tree: &Tree) -> Option<usize> {
-    let mut stack = vec![tree.root_node()];
-    let mut best: Option<usize> = None;
-    while let Some(node) = stack.pop() {
-        if node.is_error() || node.is_missing() {
-            let l = node.start_position().row + 1;
-            best = Some(best.map_or(l, |b| b.min(l)));
-        }
-        if node.has_error() {
-            let mut c = node.walk();
-            stack.extend(node.children(&mut c));
-        }
-    }
-    best
+    parse(lang, src).map(|t| errors(&t).0)
 }
 
 /// refuse `new` if it has syntax errors and `old` had none. files that were
@@ -303,12 +306,12 @@ pub fn guard(rel: &str, old: Option<&[u8]>, new: &[u8]) -> Result<(), String> {
     let Some(tree) = parse(lang, new) else {
         return Ok(());
     };
-    let after = error_count(&tree);
+    let (after, first) = errors(&tree);
     let before = old.and_then(|o| parse_errors(lang, o)).unwrap_or(0);
     if after == 0 || before > 0 {
         return Ok(());
     }
-    let line = first_error_line(&tree).unwrap_or(1);
+    let line = first.unwrap_or(1);
     let shown = crate::text::lines(new)
         .get(line - 1)
         .map(|l| crate::enc::show(crate::hash::strip_eol(l)).into_owned())
