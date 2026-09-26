@@ -1,6 +1,8 @@
 pub mod config;
 pub mod diff;
+pub mod edit;
 pub mod find;
+pub mod fsio;
 pub mod grep;
 pub mod hash;
 pub mod hits;

@@ -179,7 +179,12 @@ fn run(ctx: &Ctx, cmd: Cmd) -> ax::Result<Report> {
         Cmd::Read { paths, sym, full } => {
             return ax::read::run(ctx, &paths, sym.as_deref(), full);
         }
-        Cmd::Edit { .. } => "edit",
+        Cmd::Edit { path } => {
+            use std::io::Read;
+            let mut input = Vec::new();
+            std::io::stdin().read_to_end(&mut input)?;
+            return ax::edit::run(ctx, &path, &input);
+        }
         Cmd::Write { .. } => "write",
         Cmd::Patch => "patch",
         Cmd::Diff { full, paths } => return ax::diff::run(ctx, full, &paths),
