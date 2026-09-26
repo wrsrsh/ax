@@ -471,7 +471,7 @@ def main(argv: list[str] | None = None) -> int:
 
     dry = a.agent == "stub" or a.dry_run
     kw: dict = dict(agent=a.agent, time_cap_s=a.time_cap, turn_cap=a.turn_cap, model=a.model, effort=a.effort,
-                    catalog_src=a.catalog, prices=load_prices(model=a.model))
+                    catalog_src=a.catalog, prices=load_prices())
     run_fn = run_one
     if a.agent == "codex":
         if a.dry_run:

@@ -133,12 +133,11 @@ def test_infra_reason():
 
 
 def test_prices(tmp_path, capsys):
-    assert load_prices(tmp_path / "nope.json") == {"input": 0.0, "cached_input": 0.0, "output": 0.0}
+    assert load_prices(tmp_path / "nope.json") == {"input": 0.0, "cached_input": 0.0, "cache_write": 0.0, "output": 0.0}
     assert "warning" in capsys.readouterr().err
-    (tmp_path / "p.json").write_text('{"input": 1.25, "cached_input": 0.125, "output": 10}')
-    assert load_prices(tmp_path / "p.json")["output"] == 10.0
-    (tmp_path / "q.json").write_text('{"gpt-6-astra": {"input": 2, "cached_input": 0.2, "output": 8}}')
-    assert load_prices(tmp_path / "q.json")["input"] == 2.0
+    (tmp_path / "p.json").write_text('{"per_million": {"input": 1.25, "cached_input": 0.125, "output": 10}}')
+    p = load_prices(tmp_path / "p.json")
+    assert p["output"] == 10.0 and p["cache_write"] == 0.0
 
 
 def test_cli_refuses_unapproved_paid_runs(capsys):
