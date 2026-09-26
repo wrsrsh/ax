@@ -169,6 +169,22 @@ fn diff_clean_dirty_untracked_and_caps() {
     let o = ax_env(t.path(), &[("AX_READ_WINDOW", "3")], &["diff", "--full"]);
     assert!(!summary(&o).contains("showed"));
 
+    let o = ax(t.path(), &["diff", "--stat"]);
+    let out = stdout(&o);
+    assert!(
+        out.contains(" M src/router.ts  +2 -1") && !out.contains("+export const s = 3"),
+        "{out}"
+    );
+    assert!(
+        summary(&o).ends_with("stat only; `ax diff` for the hunks."),
+        "{}",
+        summary(&o)
+    );
+    assert_eq!(
+        ax(t.path(), &["diff", "--stat", "--full"]).status.code(),
+        Some(2)
+    );
+
     // path filter, relative to cwd
     let o = ax(&t.path().join("src"), &["diff", "router.ts"]);
     let out = stdout(&o);

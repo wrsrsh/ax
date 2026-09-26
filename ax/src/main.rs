@@ -73,8 +73,11 @@ enum Cmd {
         #[arg(long)]
         all: bool,
     },
-    /// symbol outline of a file or dir
-    Outline { path: String },
+    /// symbol outline of files or dirs
+    Outline {
+        #[arg(required = true)]
+        paths: Vec<String>,
+    },
     /// jump to a symbol definition
     Def {
         sym: String,
@@ -133,6 +136,9 @@ enum Cmd {
         /// every hunk, no cap
         #[arg(long)]
         full: bool,
+        /// status and per-file counts only, no hunks
+        #[arg(long, conflicts_with = "full")]
+        stat: bool,
         /// limit to these paths
         paths: Vec<String>,
     },
@@ -200,7 +206,7 @@ fn run(ctx: &Ctx, cmd: Cmd) -> ax::Result<Report> {
                 all,
             },
         ),
-        Cmd::Outline { path } => ax::symbols::outline(ctx, &path),
+        Cmd::Outline { paths } => ax::symbols::outline(ctx, &paths),
         Cmd::Def { sym, within } => ax::symbols::def(ctx, &sym, &within),
         Cmd::Refs {
             sym,
@@ -223,7 +229,7 @@ fn run(ctx: &Ctx, cmd: Cmd) -> ax::Result<Report> {
             ax::write::run(ctx, &path, &opts, &stdin()?)
         }
         Cmd::Patch { dry_run } => ax::patch::run(ctx, &stdin()?, dry_run),
-        Cmd::Diff { full, paths } => ax::diff::run(ctx, full, &paths),
+        Cmd::Diff { full, stat, paths } => ax::diff::run(ctx, full, stat, &paths),
         Cmd::AgentHelp { env } => Ok(ax::help::run(env)),
     }
 }

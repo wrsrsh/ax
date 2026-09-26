@@ -34,9 +34,46 @@ fn outline_lines(syms: &[Symbol], max_depth: usize) -> Vec<String> {
         .collect()
 }
 
-/// `ax outline <path|dir>`. a file shows every symbol; a dir shows top-level
-/// symbols + their direct members per file.
-pub fn outline(ctx: &Ctx, path: &str) -> Result<Report> {
+/// `ax outline <path>...`. a file shows every symbol; a dir shows top-level
+/// symbols + their direct members per file. several paths come back one
+/// after the other under one summary.
+pub fn outline(ctx: &Ctx, paths: &[String]) -> Result<Report> {
+    if let [one] = paths {
+        return outline_one(ctx, one);
+    }
+    let mut r = Report::new("outline");
+    let (mut total, mut shown, mut truncated) = (0, 0, false);
+    let mut data = Vec::new();
+    for p in paths {
+        let one = outline_one(ctx, p)?;
+        if !r.lines.is_empty() {
+            r.lines.push(String::new());
+        }
+        r.lines.extend(one.lines);
+        total += one.summary.total;
+        shown += one.summary.shown;
+        truncated |= one.summary.truncated;
+        data.push(one.data);
+    }
+    r.summary = Summary {
+        total,
+        shown,
+        truncated,
+        text: format!(
+            "{total} symbols across {}{}",
+            text::plural(paths.len(), "path"),
+            if truncated {
+                ", some cut; `ax outline <one path>` for the rest."
+            } else {
+                "."
+            }
+        ),
+    };
+    r.data = json!({ "paths": data });
+    Ok(r)
+}
+
+fn outline_one(ctx: &Ctx, path: &str) -> Result<Report> {
     let abs = repo::absolute(&ctx.cwd, path.as_ref());
     if !abs.exists() {
         return Err(AxError(format!("no such path: {path}")));

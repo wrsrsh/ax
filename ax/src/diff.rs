@@ -1,4 +1,4 @@
-//! `ax diff [--full] [paths…]`: what changed vs HEAD, in one bounded shot.
+//! `ax diff [--full|--stat] [paths…]`: what changed vs HEAD, in one bounded shot.
 //! status + per-file +/- counts, untracked files with line counts, then the
 //! hunks, capped at one read window unless --full.
 
@@ -33,7 +33,7 @@ struct FileChange {
     removed: Option<usize>,
 }
 
-pub fn run(ctx: &Ctx, full: bool, paths: &[String]) -> Result<Report> {
+pub fn run(ctx: &Ctx, full: bool, stat: bool, paths: &[String]) -> Result<Report> {
     let root = &ctx.root;
     // paths come in relative to cwd, git -C root wants them relative to root
     let paths: Vec<String> = paths
@@ -149,8 +149,8 @@ pub fn run(ctx: &Ctx, full: bool, paths: &[String]) -> Result<Report> {
     } else {
         ctx.cfg.read_window
     };
-    let shown = patch_lines.len().min(cap);
-    if !patch_lines.is_empty() {
+    let shown = if stat { 0 } else { patch_lines.len().min(cap) };
+    if shown > 0 {
         r.lines.push(String::new());
         r.lines
             .extend(patch_lines[..shown].iter().map(|l| l.to_string()));
@@ -159,7 +159,9 @@ pub fn run(ctx: &Ctx, full: bool, paths: &[String]) -> Result<Report> {
         "{} changed, +{plus} -{minus}.",
         text::plural(changes.len(), "file")
     );
-    if shown < patch_lines.len() {
+    if stat {
+        text.push_str(" stat only; `ax diff` for the hunks.");
+    } else if shown < patch_lines.len() {
         text.push_str(&format!(
             " showed {shown} of {} diff lines; --full for all, or `ax diff <path>` for one file.",
             patch_lines.len()
@@ -171,7 +173,7 @@ pub fn run(ctx: &Ctx, full: bool, paths: &[String]) -> Result<Report> {
     r.summary = Summary {
         total: changes.len(),
         shown: changes.len(),
-        truncated: shown < patch_lines.len(),
+        truncated: !stat && shown < patch_lines.len(),
         text,
     };
     r.data = json!({

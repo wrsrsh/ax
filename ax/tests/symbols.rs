@@ -62,6 +62,26 @@ fn outline_file_and_dir() {
 }
 
 #[test]
+fn outline_many_paths() {
+    let t = sym_fixture();
+    let o = ax(t.path(), &["outline", "src/app.ts", "py/mod.py"]);
+    assert!(o.status.success());
+    let b = body(&o);
+    assert_eq!(b[0], "src/app.ts  (11 lines)");
+    assert!(
+        b.contains(&"".to_string()) && b.iter().any(|l| l.starts_with("py/mod.py  (")),
+        "{b:?}"
+    );
+    assert!(
+        summary(&o).starts_with("5 symbols across 2 paths."),
+        "{}",
+        summary(&o)
+    );
+    let o = ax(t.path(), &["outline"]);
+    assert_eq!(o.status.code(), Some(2));
+}
+
+#[test]
 fn outline_unsupported_and_missing() {
     let t = sym_fixture();
     let o = ax(t.path(), &["outline", "notes.md"]);
