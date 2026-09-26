@@ -1,0 +1,13 @@
+{
+  "model": "gpt-6-astra",
+  "provider": "azure_foundry",
+  "currency": "USD",
+  "per_million": {
+    "input": 10.0,
+    "cached_input": 1.0,
+    "output": 50.0
+  },
+  "source": "https://azure.microsoft.com/en-us/blog/gpt-6-astra-sol-and-luna-for-production-agents-in-microsoft-foundry/",
+  "checked": "2026-09-26",
+  "notes": "global standard (pay-as-you-go), short-context rates. azure pricing page still shows placeholders for gpt-6 and points to the blog. cache writes are billed separately at $12.50/1M. long-context requests: $20 input / $2 cached / $25 cache write / $75 output; threshold not stated on any official page checked (third parties say >272k input tokens, whole request). us data zone is +10% ($11/$1.10/$55), eu data zone is +20% ($12/$1.20/$60). reasoning tokens bill as output (learn.microsoft.com reasoning doc). no per-token difference by reasoning effort; medium just changes how many tokens get spent. no per-request minimum found. context window 1,050,000 (922k in / 128k out). openai direct api matches: $10 / $1 / $50 standard."
+}
