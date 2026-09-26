@@ -5,8 +5,9 @@ import subprocess
 import pytest
 
 from ax_eval.grade import grade, patch_paths, summarize
-from ax_eval.mine import TASKS
-from ax_eval.parity import EVAL
+from ax_eval.util import EVAL, TASKS
+
+HONO = EVAL / ".cache" / "hono-full"
 
 TEST_PATCH = """diff --git a/src/a.test.ts b/src/a.test.ts
 --- a/src/a.test.ts
@@ -37,20 +38,22 @@ def test_summarize():
     assert not r["resolved"] and r["error"] == "agent diff doesn't apply"
 
 
+def have_image(image: str) -> bool:
+    return subprocess.run(["docker", "image", "inspect", image], capture_output=True).returncode == 0
+
+
 def _tasks(n):
-    """validated tasks whose docker image is built on this machine."""
+    """validated tasks whose docker image and hono clone are on this machine."""
     f = TASKS / "tasks.jsonl"
-    if not f.exists() or not shutil.which("docker"):
+    if not f.exists() or not HONO.exists() or not shutil.which("docker"):
         return []
-    have = lambda img: subprocess.run(["docker", "image", "inspect", img], capture_output=True).returncode == 0  # noqa: E731
-    return [t for t in (json.loads(l) for l in f.open()) if have(t["image"])][:n]
+    return [t for t in (json.loads(l) for l in f.open()) if have_image(t["image"])][:n]
 
 
 def vandal_diff(task: dict, tmp) -> str:
     """what a cheating agent would hand in: the gold fix plus a gutted test file."""
-    repo = EVAL / ".cache" / "hono-full"
     wt = tmp / "wt"
-    subprocess.run(["git", "-C", str(repo), "worktree", "add", "-q", "--detach", str(wt), task["base"]], check=True)
+    subprocess.run(["git", "-C", str(HONO), "worktree", "add", "-q", "--detach", str(wt), task["base"]], check=True)
     try:
         subprocess.run(["git", "-C", str(wt), "apply"], input=task["gold_patch"], text=True, check=True)
         target = wt / task["test_run_files"][0]
@@ -59,10 +62,10 @@ def vandal_diff(task: dict, tmp) -> str:
         subprocess.run(["git", "-C", str(wt), "add", "-A"], check=True)
         return subprocess.run(["git", "-C", str(wt), "diff", "--cached"], capture_output=True, text=True, check=True).stdout
     finally:
-        subprocess.run(["git", "-C", str(repo), "worktree", "remove", "--force", str(wt)], check=False)
+        subprocess.run(["git", "-C", str(HONO), "worktree", "remove", "--force", str(wt)], check=False)
 
 
-@pytest.mark.skipif(not _tasks(1), reason="needs docker + a locally built task image")
+@pytest.mark.skipif(not _tasks(1), reason="needs docker, a locally built task image and the hono clone")
 @pytest.mark.parametrize("task", _tasks(2), ids=lambda t: t["id"])
 def test_grade_real_task(task, tmp_path):
     gold = grade(task, task["gold_patch"])

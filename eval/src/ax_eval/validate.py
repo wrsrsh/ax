@@ -19,20 +19,17 @@ import subprocess
 import sys
 import tempfile
 import time
+from collections import Counter
 from pathlib import Path
 
-from ax_eval.mine import TASKS
-from ax_eval.parity import EVAL
+from ax_eval.util import EVAL, TASKS, git, sh
 
 NODE_IMAGE = "node:24-bookworm"
 GOLD_RUNS = 3
 
 
-def sh(*cmd: str, check: bool = True, **kw) -> subprocess.CompletedProcess:
-    return subprocess.run(list(cmd), capture_output=True, text=True, check=check, **kw)
-
-
 def lockfile(repo: Path, commit: str) -> tuple[str, bytes]:
+    # raw bytes: their hash names the image
     for name in ("pnpm-lock.yaml", "bun.lock"):
         b = subprocess.run(["git", "show", f"{commit}:{name}"], cwd=repo, capture_output=True).stdout
         if b:
@@ -41,8 +38,7 @@ def lockfile(repo: Path, commit: str) -> tuple[str, bytes]:
 
 
 def package_manager(repo: Path, commit: str) -> str:
-    pj = json.loads(sh("git", "show", f"{commit}:package.json", cwd=repo).stdout)
-    return pj.get("packageManager", "")
+    return json.loads(git(repo, "show", f"{commit}:package.json")).get("packageManager", "")
 
 
 def ensure_image(repo: Path, commit: str) -> str:
@@ -168,7 +164,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--only", nargs="*")
     a = p.parse_args(argv)
     repo = full_clone()
-    cands = [json.loads(l) for l in open(TASKS / "candidates.jsonl")]
+    cands = [json.loads(l) for l in (TASKS / "candidates.jsonl").read_text().splitlines()]
     if a.only:
         cands = [c for c in cands if c["id"] in a.only]
     # build images up front, serially; a base we can't build for drops its tasks
@@ -190,7 +186,8 @@ def main(argv: list[str] | None = None) -> int:
     done = []
     with cf.ThreadPoolExecutor(a.jobs) as ex:
         for i, r in enumerate(ex.map(one, cands), 1):
-            print(f"[{i}/{len(cands)}] {r['id']}: {r.get('dropped') or f'ok f2p={len(r['fail_to_pass'])} p2p={len(r['pass_to_pass'])}'}", file=sys.stderr, flush=True)
+            status = r.get("dropped") or f"ok f2p={len(r['fail_to_pass'])} p2p={len(r['pass_to_pass'])}"
+            print(f"[{i}/{len(cands)}] {r['id']}: {status}", file=sys.stderr, flush=True)
             done.append(r)
     ok = [r for r in done if "dropped" not in r]
     bad = [r for r in done if "dropped" in r]
@@ -200,10 +197,7 @@ def main(argv: list[str] | None = None) -> int:
     with open(TASKS / "dropped.jsonl", "w") as f:
         for r in bad:
             f.write(json.dumps({"id": r["id"], "reason": r["dropped"]}) + "\n")
-    reasons: dict[str, int] = {}
-    for r in bad:
-        k = r["dropped"].split(":")[0]
-        reasons[k] = reasons.get(k, 0) + 1
+    reasons = Counter(r["dropped"].split(":")[0] for r in bad)
     print(json.dumps({"validated": len(ok), "dropped": reasons}), file=sys.stderr)
     return 0
 

@@ -15,8 +15,8 @@ from ax_eval.fakeapi import Script, serve
 DISABLED = ["goals", "multi_agent", "apps", "browser_use", "computer_use", "image_generation", "in_app_browser", "plugins", "hooks"]
 
 
-def codex_home(dir: Path, port: int, catalog: Path) -> Path:
-    home = dir / "codex-home"
+def codex_home(root: Path, port: int, catalog: Path) -> Path:
+    home = root / "codex-home"
     home.mkdir(parents=True, exist_ok=True)
     (home / "config.toml").write_text(
         f'''model = "gpt-6-astra"
