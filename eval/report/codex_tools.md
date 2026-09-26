@@ -15,5 +15,6 @@ other things every setup gets, equally:
 - `--disable goals multi_agent apps browser_use computer_use image_generation in_app_browser plugins hooks`
 - the `collaboration` namespace (spawn_agent etc.) can't be switched off with any feature flag in 0.156.0. `agents.max_concurrent_threads_per_session = 1` (0 is rejected) keeps it to the root thread, so no sub-agents.
 - `request_user_input` stays; in `exec` mode nobody answers it.
+- config lives in a fresh `CODEX_HOME` written by `ax_eval.setups`. `--ignore-user-config` is not used: it skips `$CODEX_HOME/config.toml` too, and codex then goes to api.openai.com instead of the configured provider.
 
 what codex prints with `--json`: `thread.started`, `turn.started`, `item.started` / `item.completed` with item types `command_execution` (command, aggregated_output, exit_code), `file_change` (apply_patch: changes[path, kind], status) and `agent_message`, then `turn.completed` with usage `{input_tokens, cached_input_tokens, cache_write_input_tokens, output_tokens, reasoning_output_tokens}`, or `error` / `turn.failed`.
