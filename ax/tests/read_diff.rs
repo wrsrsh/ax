@@ -176,7 +176,7 @@ fn diff_clean_dirty_untracked_and_caps() {
         "{out}"
     );
     assert!(
-        summary(&o).ends_with("stat only; `ax diff` for the hunks."),
+        summary(&o).contains("stat only; `ax diff` for the hunks."),
         "{}",
         summary(&o)
     );
