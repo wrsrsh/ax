@@ -1,0 +1,10 @@
+{"type": "thread.started", "thread_id": "01a0de3e-3f1a-7432-8f31-68c056335fc6"}
+{"type": "turn.started"}
+{"type": "item.started", "item": {"id": "item_0", "type": "command_execution", "command": "/usr/bin/bash -lc 'ax read a.txt'", "aggregated_output": "", "exit_code": null, "status": "in_progress"}}
+{"type": "item.completed", "item": {"id": "item_0", "type": "command_execution", "command": "/usr/bin/bash -lc 'ax read a.txt'", "aggregated_output": "a.txt  (1 line, hash b58d2b17)\n1:1707  x\nread 1 file (1 line shown).\n", "exit_code": 0, "status": "completed"}}
+{"type": "item.started", "item": {"id": "item_1", "type": "command_execution", "command": "/usr/bin/bash -lc 'ax grep x'", "aggregated_output": "", "exit_code": null, "status": "in_progress"}}
+{"type": "item.completed", "item": {"id": "item_1", "type": "command_execution", "command": "/usr/bin/bash -lc 'ax grep x'", "aggregated_output": "a.txt\n  1:1707  x\n1 hit for /x/ in 1 file.\n", "exit_code": 0, "status": "completed"}}
+{"type": "item.started", "item": {"id": "item_2", "type": "command_execution", "command": "/usr/bin/bash -lc \"printf '@@ find\\\\nx\\\\n@@ with\\\\ny\\\\n' | ax edit a.txt\"", "aggregated_output": "", "exit_code": null, "status": "in_progress"}}
+{"type": "item.completed", "item": {"id": "item_2", "type": "command_execution", "command": "/usr/bin/bash -lc \"printf '@@ find\\\\nx\\\\n@@ with\\\\ny\\\\n' | ax edit a.txt\"", "aggregated_output": "a.txt: +1 -1  (1 op)\n  1:1554  y\nwrote a.txt (1 line, hash b58a4eba). anchors above are fresh.\n", "exit_code": 0, "status": "completed"}}
+{"type": "item.completed", "item": {"id": "item_3", "type": "agent_message", "text": "edited"}}
+{"type": "turn.completed", "usage": {"input_tokens": 4800, "cached_input_tokens": 4000, "cache_write_input_tokens": 0, "output_tokens": 160, "reasoning_output_tokens": 64}}

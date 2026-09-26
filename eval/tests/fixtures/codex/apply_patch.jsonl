@@ -1,0 +1,6 @@
+{"type": "thread.started", "thread_id": "01a0de3e-4257-7a01-bc3e-1bdbeacae538"}
+{"type": "turn.started"}
+{"type": "item.started", "item": {"id": "item_0", "type": "file_change", "changes": [{"path": "/repo/a.txt", "kind": "update"}], "status": "in_progress"}}
+{"type": "item.completed", "item": {"id": "item_0", "type": "file_change", "changes": [{"path": "/repo/a.txt", "kind": "update"}], "status": "completed"}}
+{"type": "item.completed", "item": {"id": "item_1", "type": "agent_message", "text": "patched"}}
+{"type": "turn.completed", "usage": {"input_tokens": 2400, "cached_input_tokens": 2000, "cache_write_input_tokens": 0, "output_tokens": 80, "reasoning_output_tokens": 32}}

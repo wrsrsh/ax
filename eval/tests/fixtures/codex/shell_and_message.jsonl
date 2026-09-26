@@ -1,0 +1,8 @@
+{"type": "thread.started", "thread_id": "01a0de3e-3bf4-7c61-9796-df37c393b357"}
+{"type": "turn.started"}
+{"type": "item.started", "item": {"id": "item_0", "type": "command_execution", "command": "/usr/bin/bash -lc 'cat a.txt'", "aggregated_output": "", "exit_code": null, "status": "in_progress"}}
+{"type": "item.completed", "item": {"id": "item_0", "type": "command_execution", "command": "/usr/bin/bash -lc 'cat a.txt'", "aggregated_output": "x\n", "exit_code": 0, "status": "completed"}}
+{"type": "item.started", "item": {"id": "item_1", "type": "command_execution", "command": "/usr/bin/bash -lc 'grep -n x a.txt'", "aggregated_output": "", "exit_code": null, "status": "in_progress"}}
+{"type": "item.completed", "item": {"id": "item_1", "type": "command_execution", "command": "/usr/bin/bash -lc 'grep -n x a.txt'", "aggregated_output": "1:x\n", "exit_code": 0, "status": "completed"}}
+{"type": "item.completed", "item": {"id": "item_2", "type": "agent_message", "text": "done"}}
+{"type": "turn.completed", "usage": {"input_tokens": 3600, "cached_input_tokens": 3000, "cache_write_input_tokens": 0, "output_tokens": 120, "reasoning_output_tokens": 48}}
