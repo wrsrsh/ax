@@ -22,11 +22,7 @@ pub fn is_binary(b: &[u8]) -> bool {
 
 /// `1 line`, `2 lines`.
 pub fn lines_label(n: usize) -> String {
-    if n == 1 {
-        "1 line".into()
-    } else {
-        format!("{n} lines")
-    }
+    plural(n, "line")
 }
 
 /// `12:a3f1  code` pasted back as code: most non-empty lines start with an

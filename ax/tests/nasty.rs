@@ -175,10 +175,7 @@ fn failed_and_dry_run_writes_leave_everything_untouched() {
     );
     let p = b"*** Begin Patch\n*** Update File: crlf.ts\n-nope\n+x\n*** Update File: bom.js\n-const bom = 1\n+const bom = 2\n*** End Patch\n";
     clean(&run(t.path(), &["patch"], p), "patch");
-    clean(
-        &run(t.path(), &["patch", "--dry-run"], &p[..p.len()]),
-        "patch dry",
-    );
+    clean(&run(t.path(), &["patch", "--dry-run"], p), "patch dry");
     assert_eq!(snapshot(t.path()), before);
 }
 

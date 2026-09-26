@@ -56,26 +56,70 @@ pub fn fixture() -> tempfile::TempDir {
     t
 }
 
+fn cmd(dir: &Path, env: &[(&str, &str)], args: &[&str]) -> Command {
+    let mut c = Command::cargo_bin("ax").unwrap();
+    c.current_dir(dir).args(args).envs(env.iter().copied());
+    c
+}
+
 pub fn ax(dir: &Path, args: &[&str]) -> Output {
-    Command::cargo_bin("ax")
-        .unwrap()
-        .current_dir(dir)
-        .args(args)
+    cmd(dir, &[], args).output().unwrap()
+}
+
+pub fn ax_env(dir: &Path, env: &[(&str, &str)], args: &[&str]) -> Output {
+    cmd(dir, env, args).output().unwrap()
+}
+
+/// `ax` with `input` on stdin.
+pub fn ax_in(dir: &Path, args: &[&str], input: impl AsRef<[u8]>) -> Output {
+    ax_env_in(dir, &[], args, input)
+}
+
+pub fn ax_env_in(
+    dir: &Path,
+    env: &[(&str, &str)],
+    args: &[&str],
+    input: impl AsRef<[u8]>,
+) -> Output {
+    cmd(dir, env, args)
+        .write_stdin(input.as_ref())
         .output()
         .unwrap()
 }
 
-pub fn ax_env(dir: &Path, env: &[(&str, &str)], args: &[&str]) -> Output {
-    let mut c = Command::cargo_bin("ax").unwrap();
-    c.current_dir(dir).args(args);
-    for (k, v) in env {
-        c.env(k, v);
-    }
-    c.output().unwrap()
+/// anchor for line n, taken from `ax read --json` like an agent would.
+pub fn anchor(dir: &Path, path: &str, n: usize) -> String {
+    let o = ax(dir, &["--json", "read", &format!("{path}:{n}-{n}")]);
+    let v: serde_json::Value = serde_json::from_slice(&o.stdout).unwrap();
+    v["data"]["files"][0]["rows"][0]["anchor"]
+        .as_str()
+        .unwrap()
+        .to_string()
+}
+
+/// `rg <args>` in `dir`, output lines sorted.
+pub fn rg(dir: &Path, args: &[&str]) -> Vec<String> {
+    let o = std::process::Command::new("rg")
+        .args(args)
+        .current_dir(dir)
+        .stdin(std::process::Stdio::null())
+        .output()
+        .unwrap();
+    let mut lines: Vec<String> = String::from_utf8(o.stdout)
+        .unwrap()
+        .lines()
+        .map(str::to_string)
+        .collect();
+    lines.sort();
+    lines
 }
 
 pub fn stdout(o: &Output) -> String {
     String::from_utf8(o.stdout.clone()).unwrap()
+}
+
+pub fn stderr(o: &Output) -> String {
+    String::from_utf8_lossy(&o.stderr).into_owned()
 }
 
 /// all output lines except the trailing summary line.

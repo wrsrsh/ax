@@ -12,7 +12,6 @@ pub struct WriteOpts<'a> {
 }
 
 pub fn run(ctx: &Ctx, path: &str, opts: &WriteOpts, input: &[u8]) -> Result<Report> {
-    let if_hash = opts.if_hash;
     let abs = fsio::target(ctx, path)?;
     let rel = repo::rel(&ctx.root, &abs);
     if abs.is_dir() {
@@ -26,7 +25,7 @@ pub fn run(ctx: &Ctx, path: &str, opts: &WriteOpts, input: &[u8]) -> Result<Repo
         r.failed = true;
         r.data = json!({"path": rel, "outcome": outcome});
     };
-    if old.is_some() && if_hash.is_none() && !opts.force {
+    if old.is_some() && opts.if_hash.is_none() && !opts.force {
         refuse(
             &mut r,
             format!(
@@ -55,8 +54,8 @@ pub fn run(ctx: &Ctx, path: &str, opts: &WriteOpts, input: &[u8]) -> Result<Repo
         }
     };
     let input: &[u8] = &encoded;
-    let lines = crate::text::lines(input);
-    if crate::text::looks_anchored(&lines) {
+    let lines = text::lines(input);
+    if text::looks_anchored(&lines) {
         refuse(
             &mut r,
             "the content starts with LINE:HASH anchors copied from ax output; send just the code, without the `12:a3f1  ` prefix".into(),
@@ -64,7 +63,7 @@ pub fn run(ctx: &Ctx, path: &str, opts: &WriteOpts, input: &[u8]) -> Result<Repo
         );
         return Ok(r);
     }
-    if let Some(want) = if_hash {
+    if let Some(want) = opts.if_hash {
         let have = old.as_deref().map(hash::file_hash);
         if have.as_deref() != Some(want) {
             let why = match &have {
@@ -73,10 +72,7 @@ pub fn run(ctx: &Ctx, path: &str, opts: &WriteOpts, input: &[u8]) -> Result<Repo
                     "{rel} changed since you read it (hash is {h}, --if said {want}); read it again"
                 ),
             };
-            r.lines.push(why);
-            r.summary = Summary::plain("nothing written (stale).");
-            r.failed = true;
-            r.data = json!({"path": rel, "outcome": "stale"});
+            refuse(&mut r, why, "stale");
             return Ok(r);
         }
     }
@@ -97,14 +93,11 @@ pub fn run(ctx: &Ctx, path: &str, opts: &WriteOpts, input: &[u8]) -> Result<Repo
     let n = text::line_count(input);
     let what = match &old {
         None => "created".to_string(),
-        Some(o) => {
-            let d = crate::edit::Doc::parse(o).lines.len();
-            format!(
-                "replaced ({} → {})",
-                text::lines_label(d),
-                text::lines_label(n)
-            )
-        }
+        Some(o) => format!(
+            "replaced ({} → {})",
+            text::lines_label(text::line_count(o)),
+            text::lines_label(n)
+        ),
     };
     let mut summary = format!(
         "{} {rel}: {what}, hash {}.",
@@ -117,19 +110,14 @@ pub fn run(ctx: &Ctx, path: &str, opts: &WriteOpts, input: &[u8]) -> Result<Repo
     );
     let old_lines: std::collections::HashSet<&[u8]> = old
         .as_deref()
-        .map(|o| {
-            crate::text::lines(o)
-                .into_iter()
-                .map(crate::hash::strip_eol)
-                .collect()
-        })
+        .map(|o| text::lines(o).into_iter().map(hash::strip_eol).collect())
         .unwrap_or_default();
     let fresh: Vec<&[u8]> = lines
         .iter()
-        .map(|l| crate::hash::strip_eol(l))
+        .map(|l| hash::strip_eol(l))
         .filter(|l| !old_lines.contains(l))
         .collect();
-    let ws = crate::text::trailing_ws(&fresh);
+    let ws = text::trailing_ws(&fresh);
     if ws > 0 {
         summary.push_str(&format!(" note: {ws} new line(s) end in whitespace."));
     }
