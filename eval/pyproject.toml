@@ -1,0 +1,19 @@
+[project]
+name = "ax-eval"
+version = "0.1.0"
+description = "ax benchmark harness"
+
+authors = [
+    { name = "Waris", email = "waris@hug.wtf" }
+]
+requires-python = ">=3.12"
+dependencies = []
+
+[build-system]
+requires = ["uv_build>=0.12.13,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]

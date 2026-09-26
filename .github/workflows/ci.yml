@@ -1,0 +1,30 @@
+name: ci
+on: [push, pull_request]
+
+jobs:
+  ax:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ax
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ax
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test
+
+  eval:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: eval
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv run --dev pytest -q
