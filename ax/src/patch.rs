@@ -476,6 +476,18 @@ pub fn run(ctx: &Ctx, input: &[u8]) -> Result<Report> {
             }
         }
     }
+    if ctx.cfg.parse_check {
+        for (abs, new) in &writes {
+            let Some(new) = new else { continue };
+            let rel = repo::rel(&ctx.root, abs);
+            let old = std::fs::read(abs).ok();
+            crate::syntax::guard(&rel, old.as_deref(), new).map_err(|m| {
+                AxError(format!(
+                    "{m}\nnothing written. AX_NO_PARSE_CHECK=1 skips this check."
+                ))
+            })?;
+        }
+    }
     fsio::atomic_write_all(&writes)?;
 
     let mut r = Report::new("patch");

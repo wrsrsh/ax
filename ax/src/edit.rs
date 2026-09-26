@@ -654,6 +654,11 @@ pub fn run(ctx: &Ctx, path: &str, input: &[u8]) -> crate::Result<Report> {
         Ok(a) => a,
         Err(e) => return Ok(refusal_report(ctx, &rel, &src, &e)),
     };
+    if ctx.cfg.parse_check
+        && let Err(m) = crate::syntax::guard(&rel, Some(&src), &applied.bytes)
+    {
+        return Ok(refusal_report(ctx, &rel, &src, &Refusal::Parse(m)));
+    }
     if applied.bytes != src {
         fsio::atomic_write(&abs, &applied.bytes)?;
     }

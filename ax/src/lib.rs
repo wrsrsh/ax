@@ -5,6 +5,7 @@ pub mod find;
 pub mod fsio;
 pub mod grep;
 pub mod hash;
+pub mod help;
 pub mod hits;
 pub mod map;
 pub mod output;

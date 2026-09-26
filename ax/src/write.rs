@@ -29,6 +29,17 @@ pub fn run(ctx: &Ctx, path: &str, if_hash: Option<&str>, input: &[u8]) -> Result
             return Ok(r);
         }
     }
+    if ctx.cfg.parse_check
+        && let Err(m) = crate::syntax::guard(&rel, old.as_deref(), input)
+    {
+        r.lines.push(m);
+        r.summary = Summary::plain(
+            "nothing written (parse-rejected). AX_NO_PARSE_CHECK=1 skips this check.",
+        );
+        r.failed = true;
+        r.data = json!({"path": rel, "outcome": "parse-rejected"});
+        return Ok(r);
+    }
     fsio::atomic_write(&abs, input)?;
     let n = text::line_count(input);
     let what = match &old {

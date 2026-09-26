@@ -276,6 +276,48 @@ pub fn parse_errors(lang: Lang, src: &[u8]) -> Option<usize> {
     parse(lang, src).map(|t| error_count(&t))
 }
 
+/// 1-based line of the first ERROR/MISSING node.
+pub fn first_error_line(tree: &Tree) -> Option<usize> {
+    let mut stack = vec![tree.root_node()];
+    let mut best: Option<usize> = None;
+    while let Some(node) = stack.pop() {
+        if node.is_error() || node.is_missing() {
+            let l = node.start_position().row + 1;
+            best = Some(best.map_or(l, |b| b.min(l)));
+        }
+        if node.has_error() {
+            let mut c = node.walk();
+            stack.extend(node.children(&mut c));
+        }
+    }
+    best
+}
+
+/// refuse `new` if it has syntax errors and `old` had none. files that were
+/// already broken are left alone: tree-sitter's error recovery makes error
+/// counts in a broken file too jumpy to compare.
+pub fn guard(rel: &str, old: Option<&[u8]>, new: &[u8]) -> Result<(), String> {
+    let Some(lang) = Lang::from_path(rel) else {
+        return Ok(());
+    };
+    let Some(tree) = parse(lang, new) else {
+        return Ok(());
+    };
+    let after = error_count(&tree);
+    let before = old.and_then(|o| parse_errors(lang, o)).unwrap_or(0);
+    if after == 0 || before > 0 {
+        return Ok(());
+    }
+    let line = first_error_line(&tree).unwrap_or(1);
+    let shown = crate::text::lines(new)
+        .get(line - 1)
+        .map(|l| String::from_utf8_lossy(crate::hash::strip_eol(l)).into_owned())
+        .unwrap_or_default();
+    Err(format!(
+        "{rel}: this change doesn't parse ({after} syntax errors, the file had none); first around line {line}: {shown:?}"
+    ))
+}
+
 /// true if the byte range sits in code, false if it's inside a comment or a
 /// string (template substitutions like `${x}` count as code again).
 pub fn is_code(tree: &Tree, start: usize, end: usize) -> bool {
@@ -436,6 +478,25 @@ enum Mode { A, B }
             .map(|(i, _)| is_code(&t, i, i + 3))
             .collect();
         assert_eq!(hits, vec![false, true, false, true, false]);
+    }
+
+    #[test]
+    fn guard_blocks_new_errors_only() {
+        assert!(guard("a.ts", Some(b"const a = 1\n"), b"const a = 1\n").is_ok());
+        let e = guard("a.ts", Some(b"const a = 1\n"), b"const a = (\n").unwrap_err();
+        assert!(e.contains("doesn't parse") && e.contains("line 1"), "{e}");
+        assert!(
+            guard(
+                "a.ts",
+                Some(b"const a = (\n"),
+                b"const a = (\nconst b = 2\n"
+            )
+            .is_ok()
+        );
+        assert!(guard("a.md", None, b"(((").is_ok());
+        assert!(guard("new.py", None, b"def f(:\n").is_err());
+        assert!(guard("x.rs", Some(b"fn a() {}\n"), b"fn a() {\n").is_err());
+        assert!(guard("x.go", Some(b"package x\n"), b"package x\nfunc (\n").is_err());
     }
 
     #[test]

@@ -121,7 +121,11 @@ enum Cmd {
         paths: Vec<String>,
     },
     /// print the usage note for CLAUDE.md / AGENTS.md
-    AgentHelp,
+    AgentHelp {
+        /// list the AX_* env knobs instead
+        #[arg(long)]
+        env: bool,
+    },
 }
 
 fn stdin() -> ax::Result<Vec<u8>> {
@@ -132,8 +136,8 @@ fn stdin() -> ax::Result<Vec<u8>> {
 }
 
 fn run(ctx: &Ctx, cmd: Cmd) -> ax::Result<Report> {
-    let name = match cmd {
-        Cmd::Map { dir } => return ax::map::run(ctx, dir.as_deref()),
+    match cmd {
+        Cmd::Map { dir } => ax::map::run(ctx, dir.as_deref()),
         Cmd::Find {
             pattern,
             ext,
@@ -148,7 +152,7 @@ fn run(ctx: &Ctx, cmd: Cmd) -> ax::Result<Report> {
                 changed,
                 all,
             };
-            return ax::find::run(ctx, &args);
+            ax::find::run(ctx, &args)
         }
         Cmd::Grep {
             pattern,
@@ -179,55 +183,86 @@ fn run(ctx: &Ctx, cmd: Cmd) -> ax::Result<Report> {
                 count,
                 all,
             };
-            return ax::grep::run(ctx, &args);
+            ax::grep::run(ctx, &args)
         }
-        Cmd::Outline { path } => return ax::symbols::outline(ctx, &path),
-        Cmd::Def { sym, within } => return ax::symbols::def(ctx, &sym, &within),
+        Cmd::Outline { path } => ax::symbols::outline(ctx, &path),
+        Cmd::Def { sym, within } => ax::symbols::def(ctx, &sym, &within),
         Cmd::Refs {
             sym,
             code_only,
             within,
-        } => return ax::symbols::refs(ctx, &sym, code_only, &within),
-        Cmd::Read { paths, sym, full } => {
-            return ax::read::run(ctx, &paths, sym.as_deref(), full);
-        }
-        Cmd::Edit { path } => return ax::edit::run(ctx, &path, &stdin()?),
-        Cmd::Write { path, if_hash } => {
-            return ax::write::run(ctx, &path, if_hash.as_deref(), &stdin()?);
-        }
-        Cmd::Patch => return ax::patch::run(ctx, &stdin()?),
-        Cmd::Diff { full, paths } => return ax::diff::run(ctx, full, &paths),
-        Cmd::AgentHelp => "agent-help",
+        } => ax::symbols::refs(ctx, &sym, code_only, &within),
+        Cmd::Read { paths, sym, full } => ax::read::run(ctx, &paths, sym.as_deref(), full),
+        Cmd::Edit { path } => ax::edit::run(ctx, &path, &stdin()?),
+        Cmd::Write { path, if_hash } => ax::write::run(ctx, &path, if_hash.as_deref(), &stdin()?),
+        Cmd::Patch => ax::patch::run(ctx, &stdin()?),
+        Cmd::Diff { full, paths } => ax::diff::run(ctx, full, &paths),
+        Cmd::AgentHelp { env } => Ok(ax::help::run(env)),
+    }
+}
+
+fn log_call(started: std::time::Instant, exit: i32, out_bytes: usize, data: &serde_json::Value) {
+    let Ok(path) = std::env::var("AX_LOG") else {
+        return;
     };
-    Err(AxError(format!("{name}: not built yet")))
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let knobs: Vec<String> = std::env::vars()
+        .filter(|(k, _)| k.starts_with("AX_") && k != "AX_LOG")
+        .map(|(k, v)| format!("{k}={v}"))
+        .collect();
+    let line = serde_json::json!({
+        "ts": std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs_f64())
+            .unwrap_or(0.0),
+        "cmd": args.iter().find(|a| !a.starts_with('-')).cloned().unwrap_or_default(),
+        "args": args,
+        "exit": exit,
+        "out_bytes": out_bytes,
+        "ms": started.elapsed().as_secs_f64() * 1000.0,
+        "outcome": data.get("outcome").cloned().unwrap_or(serde_json::Value::Null),
+        "knobs": knobs,
+    });
+    use std::io::Write;
+    if let Ok(mut f) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+    {
+        let _ = writeln!(f, "{line}");
+    }
 }
 
 fn main() {
+    let started = std::time::Instant::now();
     let cli = Cli::parse();
     let result = Ctx::from_env()
         .map_err(AxError::from)
         .and_then(|ctx| run(&ctx, cli.cmd));
-    match result {
+    use std::io::Write;
+    let (out, exit, data, to_stderr) = match result {
         Ok(report) => {
             let out = if cli.json {
                 report.render_json()
             } else {
                 report.render_text()
             };
-            // `ax grep … | head` closing the pipe early is fine, not a panic
-            use std::io::Write;
-            let _ = std::io::stdout().lock().write_all(out.as_bytes());
-            if report.failed {
-                std::process::exit(1);
-            }
+            (out, i32::from(report.failed), report.data, false)
         }
         Err(e) => {
-            if cli.json {
-                println!("{}", serde_json::json!({ "error": e.0 }));
+            let out = if cli.json {
+                format!("{}\n", serde_json::json!({ "error": e.0 }))
             } else {
-                eprintln!("ax: {e}");
-            }
-            std::process::exit(1);
+                format!("ax: {e}\n")
+            };
+            (out, 1, serde_json::json!({ "outcome": "error" }), !cli.json)
         }
-    }
+    };
+    let _ = if to_stderr {
+        std::io::stderr().lock().write_all(out.as_bytes())
+    } else {
+        std::io::stdout().lock().write_all(out.as_bytes())
+    };
+    log_call(started, exit, out.len(), &data);
+    std::process::exit(exit);
 }
