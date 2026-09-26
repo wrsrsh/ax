@@ -11,8 +11,26 @@ use serde_json::Value;
 
 /// `14:a3f1  code`. invalid utf-8 is shown lossily; the hash is still over the
 /// raw bytes.
+/// longest line shown as is; minified files get cut here (the anchor still
+/// covers the whole line).
+pub const MAX_LINE: usize = 1000;
+
 pub fn anchored(cfg: &Config, n: usize, line: &[u8]) -> String {
-    let text = crate::enc::show(strip_eol(line));
+    let raw = strip_eol(line);
+    let text = if cfg.caps && raw.len() > MAX_LINE {
+        let mut cut = MAX_LINE;
+        while cut > 0 && (raw[cut] & 0xC0) == 0x80 {
+            cut -= 1;
+        }
+        format!(
+            "{}…[+{} bytes]",
+            crate::enc::show(&raw[..cut]),
+            raw.len() - cut
+        )
+        .into()
+    } else {
+        crate::enc::show(raw)
+    };
     if cfg.anchors {
         format!("{n}:{}  {text}", line_hash(line))
     } else {
@@ -184,6 +202,19 @@ mod tests {
         let c = Config::default();
         let l = anchored(&c, 1, &[b'a', 0xff, b'b']);
         assert!(l.ends_with("aÿb"), "{l}");
+    }
+
+    #[test]
+    fn long_lines_are_cut_for_display() {
+        let c = Config::default();
+        let long = "é".repeat(800);
+        let l = anchored(&c, 1, long.as_bytes());
+        assert!(l.contains("…[+") && l.len() < 1100, "{}", l.len());
+        let nocap = Config {
+            caps: false,
+            ..Config::default()
+        };
+        assert!(!anchored(&nocap, 1, long.as_bytes()).contains("…[+"));
     }
 
     #[test]
