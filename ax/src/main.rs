@@ -1,3 +1,5 @@
+use ax::output::Report;
+use ax::{AxError, Ctx};
 use clap::{Parser, Subcommand};
 
 /// one cli for the file work coding agents do all day: orient, find, search, read, edit.
@@ -39,10 +41,8 @@ enum Cmd {
     AgentHelp,
 }
 
-fn main() {
-    let cli = Cli::parse();
-    let _ = cli.json;
-    let name = match cli.cmd {
+fn run(_ctx: &Ctx, cmd: Cmd) -> ax::Result<Report> {
+    let name = match cmd {
         Cmd::Map { .. } => "map",
         Cmd::Find { .. } => "find",
         Cmd::Grep { .. } => "grep",
@@ -56,6 +56,30 @@ fn main() {
         Cmd::Diff => "diff",
         Cmd::AgentHelp => "agent-help",
     };
-    eprintln!("ax {name}: not built yet");
-    std::process::exit(2);
+    Err(AxError(format!("{name}: not built yet")))
+}
+
+fn main() {
+    let cli = Cli::parse();
+    let result = Ctx::from_env()
+        .map_err(AxError::from)
+        .and_then(|ctx| run(&ctx, cli.cmd));
+    match result {
+        Ok(report) => {
+            let out = if cli.json {
+                report.render_json()
+            } else {
+                report.render_text()
+            };
+            print!("{out}");
+        }
+        Err(e) => {
+            if cli.json {
+                println!("{}", serde_json::json!({ "error": e.0 }));
+            } else {
+                eprintln!("ax: {e}");
+            }
+            std::process::exit(1);
+        }
+    }
 }

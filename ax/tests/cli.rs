@@ -26,3 +26,15 @@ fn help_lists_every_subcommand() {
         assert!(help.contains(cmd), "missing {cmd} in --help");
     }
 }
+
+#[test]
+fn real_errors_exit_nonzero_and_json_says_so() {
+    let out = Command::cargo_bin("ax")
+        .unwrap()
+        .args(["--json", "patch"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(1));
+    let v: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert!(v["error"].as_str().unwrap().contains("patch"));
+}
