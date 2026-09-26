@@ -189,3 +189,15 @@ fn map_outside_git_still_works() {
     assert!(o.status.success());
     assert!(stdout(&o).contains("not a git repo"));
 }
+
+#[test]
+fn map_sees_manifests_one_level_down() {
+    let t = fixture();
+    write(t.path(), "crates/core/Cargo.toml", "[package]\n");
+    write(t.path(), "tool/pyproject.toml", "[project]\n");
+    write(t.path(), "tool/x.py", "x = 1\n");
+    let out = stdout(&ax(t.path(), &["map"]));
+    assert!(out.contains("python (tool/)"), "{out}");
+    // only one level down, deeper manifests don't count
+    assert!(!out.contains("rust ("), "{out}");
+}

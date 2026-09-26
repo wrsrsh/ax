@@ -108,7 +108,7 @@ fn scripts(dir: &Path) -> Vec<(String, String, String)> {
     out
 }
 
-fn stack(dir: &Path, ext_counts: &BTreeMap<String, usize>) -> Vec<String> {
+fn stack(dir: &Path, subdirs: &[&String], ext_counts: &BTreeMap<String, usize>) -> Vec<String> {
     let mut s = Vec::new();
     let has = |f: &str| dir.join(f).exists();
     if let Ok(pj) = std::fs::read_to_string(dir.join("package.json")) {
@@ -155,7 +155,7 @@ fn stack(dir: &Path, ext_counts: &BTreeMap<String, usize>) -> Vec<String> {
             }
         }
     }
-    for (f, name) in [
+    const MANIFESTS: [(&str, &str); 9] = [
         ("Cargo.toml", "rust (cargo)"),
         ("pyproject.toml", "python (pyproject)"),
         ("setup.py", "python (setup.py)"),
@@ -164,9 +164,20 @@ fn stack(dir: &Path, ext_counts: &BTreeMap<String, usize>) -> Vec<String> {
         ("Gemfile", "ruby"),
         ("pom.xml", "java (maven)"),
         ("build.gradle", "jvm (gradle)"),
-    ] {
+        ("package.json", "node"),
+    ];
+    for (f, name) in &MANIFESTS[..8] {
         if has(f) {
-            s.push(name.into());
+            s.push(name.to_string());
+        }
+    }
+    // monorepo-ish layouts: manifests one level down, e.g. `rust (ax/)`
+    for sub in subdirs {
+        for (f, name) in MANIFESTS {
+            if dir.join(sub).join(f).exists() {
+                let lang = name.split(' ').next().unwrap_or(name);
+                s.push(format!("{lang} ({sub}/)"));
+            }
         }
     }
     let mut exts: Vec<_> = ext_counts.iter().collect();
@@ -298,7 +309,8 @@ pub fn run(ctx: &Ctx, dir: Option<&str>) -> Result<Report> {
         format!("{head}  · mapping {base_rel}/")
     });
 
-    let st = stack(&base, &exts);
+    let subdirs: Vec<&String> = t.dirs.keys().collect();
+    let st = stack(&base, &subdirs, &exts);
     if !st.is_empty() {
         lines.push(format!("stack: {}", st.join(" · ")));
     }
