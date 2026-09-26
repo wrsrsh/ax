@@ -16,6 +16,8 @@ def test_unwrap_and_kinds():
     assert kinds("bash -lc \"printf 'x' | ax edit a.txt\"") == ["printf", "ax edit"]
     assert kinds("FOO=1 timeout 30 rg -n x src") == ["rg"]
     assert kinds("ax --json grep foo") == ["ax grep"]
+    assert kinds("rg -n 'writeSSE|retry' src && cat a.ts") == ["rg", "cat"]
+    assert kinds('/bin/bash -lc "rg -n \'a|b\' src; echo done"') == ["rg", "echo"]
 
 
 def test_scripts_count_as_file_ops():

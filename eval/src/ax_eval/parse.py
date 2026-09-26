@@ -33,6 +33,27 @@ def unwrap(command: str) -> str:
         return m.group(1).strip("'\"")
 
 
+def segments(cmd: str) -> list[list[str]]:
+    """shell words per simple command; `|`, `&&`, `;` inside quotes don't split."""
+    segs, cur = [], []
+    for line in cmd.split("\n"):
+        lex = shlex.shlex(line, posix=True, punctuation_chars="|&;")
+        lex.whitespace_split = True
+        try:
+            toks = list(lex)
+        except ValueError:
+            toks = line.split()
+        for t in toks:
+            if t and set(t) <= set("|&;"):
+                segs.append(cur)
+                cur = []
+            else:
+                cur.append(t)
+        segs.append(cur)
+        cur = []
+    return [x for x in segs if x]
+
+
 def kinds(command: str) -> list[str]:
     """every program in a shell line, `ax` tagged with its subcommand."""
     out = []
@@ -40,8 +61,7 @@ def kinds(command: str) -> list[str]:
     if "<<" in cmd:
         # a heredoc body isn't more commands
         cmd = cmd.split("\n", 1)[0]
-    for seg in re.split(r"\|\||&&|;|\||\n", cmd):
-        words = seg.strip().split()
+    for words in segments(cmd):
         while words and ("=" in words[0] or words[0] in {"sudo", "env", "time", "timeout", "xargs"}):
             words = words[1:]
             if words and words[0].isdigit():
@@ -52,7 +72,7 @@ def kinds(command: str) -> list[str]:
         if prog == "ax":
             sub = next((w for w in words[1:] if not w.startswith("-")), "")
             out.append(f"ax {sub}".strip())
-        elif prog in INTERPRETERS and (set(words[1:]) & {"-c", "-e", "-"} or "<<" in seg):
+        elif prog in INTERPRETERS and (set(words[1:]) & {"-c", "-e", "-"} or "<<" in " ".join(words)):
             out.append(f"script {prog}")
         else:
             out.append(prog)
