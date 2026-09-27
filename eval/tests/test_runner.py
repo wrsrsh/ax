@@ -136,9 +136,24 @@ def test_infra_reason():
 def test_prices(tmp_path, capsys):
     assert load_prices(tmp_path / "nope.json") == {"input": 0.0, "cached_input": 0.0, "cache_write": 0.0, "output": 0.0}
     assert "warning" in capsys.readouterr().err
+    # old flat one-model shape still reads
     (tmp_path / "p.json").write_text('{"per_million": {"input": 1.25, "cached_input": 0.125, "output": 10}}')
     p = load_prices(tmp_path / "p.json")
     assert p["output"] == 10.0 and p["cache_write"] == 0.0
+    (tmp_path / "flat.json").write_text('{"model": "gpt-6-astra", "per_million": {"input": 10}}')
+    assert load_prices(tmp_path / "flat.json")["input"] == 10.0
+    assert load_prices(tmp_path / "flat.json", model="gpt-6-luna")["input"] == 0.0
+    assert "gpt-6-luna" in capsys.readouterr().err
+    # multi-model shape, default model is gpt-6-astra
+    (tmp_path / "multi.json").write_text(json.dumps({"currency": "USD", "models": {
+        "gpt-6-astra": {"per_million": {"input": 10, "cached_input": 1, "cache_write": 12.5, "output": 50}},
+        "gpt-6-luna": {"per_million": {"input": 0.1, "cached_input": 0.01, "cache_write": 0.125, "output": 0.5}},
+    }}))
+    assert load_prices(tmp_path / "multi.json") == {"input": 10.0, "cached_input": 1.0, "cache_write": 12.5, "output": 50.0}
+    assert load_prices(tmp_path / "multi.json", model="gpt-6-luna")["cache_write"] == 0.125
+    capsys.readouterr()
+    assert load_prices(tmp_path / "multi.json", model="gpt-nope") == dict.fromkeys(("input", "cached_input", "cache_write", "output"), 0.0)
+    assert "warning" in capsys.readouterr().err
 
 
 def test_cli_refuses_unapproved_paid_runs(capsys):
