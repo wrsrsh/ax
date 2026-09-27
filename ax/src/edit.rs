@@ -17,6 +17,9 @@
 //! ambiguous); anchors whose content changed refuse the whole call and print
 //! the current lines with fresh anchors.
 //!
+//! on success the echo is short: `path: +a -r (n ops)`, then only the lines
+//! the ops changed with their new anchors (no context), capped at 12.
+//!
 //! the core (`apply`) is pure bytes-in / bytes-out so it can be property
 //! tested against a dumb reference implementation.
 
@@ -106,8 +109,9 @@ pub struct Applied {
     pub added: usize,
     pub removed: usize,
     pub relocated: usize,
-    /// changed regions in the new file: (0-based start line, line count)
-    pub regions: Vec<(usize, usize)>,
+    /// what each splice really changed, unchanged edge lines trimmed off:
+    /// (0-based start line in the new file, lines added there, lines removed)
+    pub regions: Vec<(usize, usize, usize)>,
 }
 
 fn parse_anchor(tok: &str, cfg: &Config) -> Result<Anchor, Refusal> {
@@ -567,9 +571,12 @@ pub fn apply(src: &[u8], ops: &[Op], cfg: &Config) -> Result<Applied, Refusal> {
             .zip(s.new[pre..].iter().rev())
             .take_while(|(a, b)| a.as_slice() == b.as_slice())
             .count();
-        removed += old.len() - pre - post;
-        added += s.new.len() - pre - post;
-        regions.push((out.len(), s.new.len()));
+        let (del, add) = (old.len() - pre - post, s.new.len() - pre - post);
+        removed += del;
+        added += add;
+        if add + del > 0 {
+            regions.push((out.len() + pre, add, del));
+        }
         doc.push_replacement(&mut out, s.start, s.end, &s.new);
         cursor = s.end;
     }
@@ -672,18 +679,52 @@ fn refusal_report(ctx: &Ctx, rel: &str, src: &[u8], why: &Refusal) -> Report {
     r
 }
 
-/// merge changed regions (± context) into display windows over `new`.
-fn windows(regions: &[(usize, usize)], n: usize, ctx_lines: usize) -> Vec<(usize, usize)> {
-    let mut w: Vec<(usize, usize)> = Vec::new();
-    for &(start, len) in regions {
-        let lo = start.saturating_sub(ctx_lines);
-        let hi = (start + len.max(1) + ctx_lines).min(n);
-        match w.last_mut() {
-            Some(last) if lo <= last.1 => last.1 = last.1.max(hi),
-            _ => w.push((lo, hi)),
+/// changed lines an edit echoes back before pointing at `ax read`.
+const EDIT_SHOW: usize = 12;
+
+/// the success echo: just the lines each op changed, with their new anchors,
+/// no unchanged context. a pure delete gets a one-line marker. capped at
+/// `cap` rows, then one line saying which range holds the rest.
+fn changed_rows(
+    cfg: &Config,
+    rel: &str,
+    new_lines: &[&[u8]],
+    regions: &[(usize, usize, usize)],
+    cap: usize,
+    dry_run: bool,
+) -> Vec<String> {
+    // (1-based line the row is about, text)
+    let mut rows: Vec<(usize, String)> = Vec::new();
+    for &(start, add, del) in regions {
+        if add == 0 {
+            let at = if start < new_lines.len() {
+                format!("above line {}", start + 1)
+            } else {
+                "at the end".to_string()
+            };
+            rows.push((
+                (start + 1).min(new_lines.len().max(1)),
+                format!("  (-{} {at})", text::plural(del, "line")),
+            ));
+            continue;
+        }
+        for (n, l) in new_lines.iter().enumerate().skip(start).take(add) {
+            rows.push((n + 1, format!("  {}", anchored(cfg, n + 1, l))));
         }
     }
-    w
+    if rows.len() <= cap {
+        return rows.into_iter().map(|(_, r)| r).collect();
+    }
+    let rest = &rows[cap..];
+    let (a, b) = (rest[0].0, rest[rest.len() - 1].0);
+    let mut out: Vec<String> = rows[..cap].iter().map(|(_, r)| r.clone()).collect();
+    out.push(if dry_run {
+        // nothing on disk to read yet
+        format!("  … {} more (lines {a}-{b})", rest.len())
+    } else {
+        format!("  … {} more; ax read {rel}:{a}-{b} to see", rest.len())
+    });
+    out
 }
 
 /// the agent writes UTF-8; a Windows-1252 file needs its text in 1252.
@@ -766,7 +807,7 @@ pub fn run(ctx: &Ctx, path: &str, input: &[u8], dry_run: bool) -> crate::Result<
     let new_lines = text::lines(&applied.bytes);
     let mut r = Report::new("edit");
     r.lines.push(format!(
-        "{rel}: +{} -{}  ({}{})",
+        "{rel}: +{} -{} ({}{})",
         applied.added,
         applied.removed,
         text::plural(n_ops, "op"),
@@ -776,17 +817,15 @@ pub fn run(ctx: &Ctx, path: &str, input: &[u8], dry_run: bool) -> crate::Result<
             String::new()
         }
     ));
-    for (i, (lo, hi)) in windows(&applied.regions, new_lines.len(), 2)
-        .into_iter()
-        .enumerate()
-    {
-        if i > 0 {
-            r.lines.push("  …".into());
-        }
-        for (n, l) in new_lines.iter().enumerate().take(hi).skip(lo) {
-            r.lines.push(format!("  {}", anchored(&ctx.cfg, n + 1, l)));
-        }
-    }
+    let cap = if ctx.cfg.caps { EDIT_SHOW } else { usize::MAX };
+    r.lines.extend(changed_rows(
+        &ctx.cfg,
+        &rel,
+        &new_lines,
+        &applied.regions,
+        cap,
+        dry_run,
+    ));
     let new_hash = hash::file_hash(&applied.bytes);
     let mut summary = if applied.bytes == src {
         "no change (the ops produced the same bytes).".to_string()
@@ -988,7 +1027,7 @@ mod tests {
         let ops = parse_ops(s.as_bytes(), &cfg()).unwrap();
         let r = apply(SRC.as_bytes(), &ops, &cfg()).unwrap();
         assert_eq!((r.added, r.removed), (1, 1));
-        assert_eq!(r.regions, vec![(1, 2)]);
+        assert_eq!(r.regions, vec![(2, 1, 1)]);
     }
 
     #[test]
