@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from ax_eval.parse import cost, fallback_rate, kinds, metrics, parse_ax_log, parse_events, unwrap
+from ax_eval.parse import COST_PARTS, cost, cost_parts, fallback_rate, kinds, metrics, parse_ax_log, parse_events, unwrap
 
 FX = Path(__file__).parent / "fixtures" / "codex"
 
@@ -18,6 +18,8 @@ def test_unwrap_and_kinds():
     assert kinds("ax --json grep foo") == ["ax grep"]
     assert kinds("rg -n 'writeSSE|retry' src && cat a.ts") == ["rg", "cat"]
     assert kinds('/bin/bash -lc "rg -n \'a|b\' src; echo done"') == ["rg", "echo"]
+    assert kinds("bun run test 2>&1 | tail -5") == ["bun", "tail"]
+    assert kinds("ax diff &> out.txt && cat out.txt") == ["ax diff", "cat"]
 
 
 def test_scripts_count_as_file_ops():
@@ -82,6 +84,8 @@ def test_ax_log_and_metrics(tmp_path):
     assert m["ax_rejections"] == 1
     assert m["script_calls"] == 0
     assert abs(m["cost"] - (800 * 2.0 + 4000 * 0.5 + 160 * 8.0) / 1e6) < 1e-12
+    assert abs(m["cost_uncached"] - 800 * 2.0 / 1e6) < 1e-12 and abs(m["cost_output"] - 160 * 8.0 / 1e6) < 1e-12
+    assert abs(sum(m[k] for k in COST_PARTS) - m["cost"]) < 1e-12
 
 
 def test_cost_formula():
@@ -89,3 +93,13 @@ def test_cost_formula():
     assert cost(row, {"input": 1, "cached_input": 0.1, "output": 4}) == 5.1
     row["cache_write_input_tokens"] = 1_000_000
     assert cost(row, {"input": 1, "cached_input": 0.1, "cache_write": 1.25, "output": 4}) == 6.35
+
+
+def test_cost_parts_sum_to_cost():
+    row = {"uncached_input_tokens": 1_000_000, "cached_input_tokens": 2_000_000, "cache_write_input_tokens": 1_000_000, "output_tokens": 3_000_000}
+    prices = {"input": 1, "cached_input": 0.1, "cache_write": 1.25, "output": 4}
+    parts = cost_parts(row, prices)
+    assert parts == {"cost_uncached": 1.0, "cost_cached": 0.2, "cost_cache_write": 1.25, "cost_output": 12.0}
+    assert abs(sum(parts.values()) - cost(row, prices)) < 1e-12
+    # old rows without cache writes, and prices without a cache_write rate
+    assert cost_parts({"uncached_input_tokens": 1, "cached_input_tokens": 0, "output_tokens": 0}, {"input": 1e6, "cached_input": 0, "output": 0})["cost_cache_write"] == 0

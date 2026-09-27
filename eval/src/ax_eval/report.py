@@ -20,11 +20,13 @@ from pathlib import Path
 from statistics import mean, median
 
 from ax_eval import stats
+from ax_eval.parse import COST_PARTS
 from ax_eval.setups import base_of, raw_tools
 from ax_eval.table import collect, load, splits, usable
 from ax_eval.util import REPORT, RUNS, TASKS
 
 METRICS = ["tokens", "cost", "turns", "wall_seconds"]
+PART_LABELS = {"cost_uncached": "uncached input", "cost_cached": "cached input", "cost_cache_write": "cache writes", "cost_output": "output"}
 MARGIN = 0.05  # guardrail: an ax setup may lose at most 5 pp of pass rate vs its baseline (A, or Ar for raw tools)
 TOP = 3
 BOOT = 2000
@@ -109,7 +111,7 @@ def fallback_summary(rows: list[dict]) -> dict:
             "ok": None if ci is None else ci[0] >= -MARGIN,
         }
         out["ratios"][f"{s}/{base_of(s)}"] = {}
-        for m in METRICS:
+        for m in METRICS + list(COST_PARTS):
             rat = [x / a for _, a, x in paired(rows, s, m) if a > 0]
             out["ratios"][f"{s}/{base_of(s)}"][m] = {"median": median(rat) if rat else None, "ci": boot_ci(rat, median), "n": len(rat)}
     return out
@@ -248,6 +250,33 @@ def wins_losses(rows: list[dict], setup: str, key: str, runs_link) -> list[str]:
     return out
 
 
+def cost_breakdown(rows: list[dict], setups: list[str], ratios: dict) -> list[str]:
+    """median $ per token class per setup, each class's share of the setup's total spend, and paired ratios per class."""
+    L = ["## cost breakdown", "",
+         "median $ per run for each token class; in brackets, that class's share of the setup's total spend.", ""]
+    body = []
+    for x in setups:
+        rs = [r for r in rows if r["setup"] == x]
+        sums = {k: sum(r.get(k) or 0 for r in rs) for k in COST_PARTS}
+        total = sum(sums.values())
+        body.append([x] + [f"{money(med(rs, k))} ({pct(sums[k] / total) if total else '-'})" for k in COST_PARTS] + [money(med(rs, "cost"))])
+    L += table(["setup", *PART_LABELS.values(), "median total"], body) + [""]
+    shares = [r["cache_write_input_tokens"] / r["uncached_input_tokens"] for r in rows
+              if r.get("cache_write_input_tokens") is not None and r.get("uncached_input_tokens")]
+    if shares:
+        L += [(f"cache-write tokens are {pct(median(shares))} of uncached input tokens (median over runs). "
+               "parse.cost bills both at their own rate, so if codex counts cache writes inside input_tokens, "
+               "the uncached line double-counts them."), ""]
+    body = []
+    for comp, ms in sorted(ratios.items()):
+        for k, label in PART_LABELS.items():
+            e = ms.get(k) or {}
+            body.append([comp, label, ratio(e.get("median")), ci_str(e.get("ci"), ratio), e.get("n", "-")])
+    if body:
+        L += ["paired by task against the baseline, per token class:", ""] + table(["comparison", "class", "median ratio", "95% CI", "tasks"], body) + [""]
+    return L
+
+
 def render(rows: list[dict], runs_dir: Path = RUNS, out: Path = REPORT / "REPORT.md", tasks: Path = TASKS / "final.jsonl", subset: str | None = "heldout") -> str:
     """`subset` picks the rows the numbers are computed from (default held-out only;
     None for everything). dry runs (stub, fake api) never count."""
@@ -325,6 +354,8 @@ def render(rows: list[dict], runs_dir: Path = RUNS, out: Path = REPORT / "REPORT
             e = ms.get(m) or {}
             body.append([comp, m, ratio(e.get("median")), ci_str(e.get("ci"), ratio), e.get("n", "-")])
     L += (table(["comparison", "metric", "median ratio", "95% CI", "tasks"], body) if body else ["no paired tasks."]) + [""]
+
+    L += cost_breakdown(good, setups, s["ratios"])
 
     if s.get("raw_vs_code"):
         L += ["## code mode vs raw tools", "",
