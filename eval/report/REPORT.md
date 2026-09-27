@@ -1,12 +1,12 @@
 # ax eval report
 
-generated 2026-09-27 from `runs/runs.jsonl`.
+generated 2026-09-28 from `runs/runs.jsonl`.
 
 - agent: codex, codex codex-cli 0.156.0
 - model: gpt-6-astra, effort medium
-- ax commit: 687338073221047ba63e22c2aea3a05148a423d1, 893530a822398f5c56b6c0241ab7c3c947ec4ca6
+- ax commit: 15e61f1b8778a8713cc9e1bf0d424930b3379512, 2623aca190189dd4243052679f82d75cc0bcc0c4-dirty, 687338073221047ba63e22c2aea3a05148a423d1, 893530a822398f5c56b6c0241ab7c3c947ec4ca6, 893530a822398f5c56b6c0241ab7c3c947ec4ca6-dirty
 - tasks: 50 in final.jsonl (10 dev, 40 held-out); 40 with usable runs here
-- runs: 438 real (35 dry runs ignored), 438 usable, 411 in this report (heldout split, model gpt-6-astra), 0 infra failures, 0 incomplete, 0 timed out (counted as unresolved)
+- runs: 850 real (28 dry runs ignored), 849 usable, 480 in this report (heldout split, model gpt-6-astra), 1 infra failures, 0 incomplete, 0 timed out (counted as unresolved)
 - setups: A, Ar, B, Br, C, Cr. A is the baseline (Ar for the raw-tools family); ratios and deltas are paired by task against it.
 
 ## summary
@@ -14,22 +14,22 @@ generated 2026-09-27 from `runs/runs.jsonl`.
 | setup | runs | tasks | pass rate | 95% CI | median tokens | median cost | median turns | median wall s |
 |---|---|---|---|---|---|---|---|---|
 | A | 120 | 40 | 98.3% | 95.0% to 100.0% | 194,480 | $0.657 | 12.0 | 58.0 |
-| Ar | 19 | 19 | 100.0% | 100.0% to 100.0% | 354,574 | $0.757 | 9.0 | 87.0 |
+| Ar | 40 | 40 | 97.5% | 92.5% to 100.0% | 328,082 | $0.750 | 9.5 | 87.0 |
 | B | 120 | 40 | 98.3% | 95.0% to 100.0% | 202,588 | $0.650 | 13.0 | 60.0 |
-| Br | 15 | 15 | 100.0% | 100.0% to 100.0% | 200,524 | $0.704 | 7.0 | 73.0 |
+| Br | 40 | 40 | 97.5% | 92.5% to 100.0% | 270,068 | $0.666 | 8.0 | 78.5 |
 | C | 120 | 40 | 98.3% | 95.0% to 100.0% | 201,326 | $0.661 | 14.0 | 61.0 |
-| Cr | 17 | 17 | 100.0% | 100.0% to 100.0% | 221,325 | $0.604 | 7.0 | 76.0 |
+| Cr | 40 | 40 | 97.5% | 92.5% to 100.0% | 272,284 | $0.693 | 8.0 | 81.0 |
 
 pass rate by split:
 
 | setup | dev | held-out |
 |---|---|---|
-| A | 100.0% (3/3) | 98.5% (128/130) |
-| Ar | - | 100.0% (19/19) |
-| B | 100.0% (3/3) | 98.4% (121/123) |
-| Br | - | 100.0% (15/15) |
-| C | 100.0% (3/3) | 98.4% (123/125) |
-| Cr | - | 100.0% (17/17) |
+| A | 100.0% (3/3) | 99.2% (238/240) |
+| Ar | - | 97.5% (39/40) |
+| B | 100.0% (3/3) | 97.9% (235/240) |
+| Br | - | 97.5% (39/40) |
+| C | 100.0% (3/3) | 98.8% (237/240) |
+| Cr | - | 97.5% (39/40) |
 
 ## guardrail
 
@@ -48,18 +48,18 @@ median over tasks of (setup mean / baseline mean); below 1 means the ax setup us
 | B/A | cost | 0.95x | 0.90x to 0.97x | 40 |
 | B/A | turns | 1.04x | 1.00x to 1.14x | 40 |
 | B/A | wall_seconds | 1.02x | 0.98x to 1.08x | 40 |
-| Br/Ar | tokens | 0.77x | 0.60x to 1.02x | 8 |
-| Br/Ar | cost | 0.79x | 0.70x to 0.89x | 8 |
-| Br/Ar | turns | 0.82x | 0.56x to 0.88x | 8 |
-| Br/Ar | wall_seconds | 0.89x | 0.65x to 1.29x | 8 |
+| Br/Ar | tokens | 0.83x | 0.73x to 0.93x | 40 |
+| Br/Ar | cost | 0.89x | 0.85x to 0.96x | 40 |
+| Br/Ar | turns | 0.80x | 0.71x to 0.89x | 40 |
+| Br/Ar | wall_seconds | 0.98x | 0.86x to 1.04x | 40 |
 | C/A | tokens | 0.98x | 0.89x to 1.03x | 40 |
 | C/A | cost | 0.94x | 0.90x to 0.96x | 40 |
 | C/A | turns | 1.03x | 0.99x to 1.12x | 40 |
 | C/A | wall_seconds | 1.04x | 0.97x to 1.08x | 40 |
-| Cr/Ar | tokens | 0.77x | 0.56x to 1.22x | 9 |
-| Cr/Ar | cost | 0.86x | 0.73x to 1.14x | 9 |
-| Cr/Ar | turns | 0.80x | 0.60x to 1.00x | 9 |
-| Cr/Ar | wall_seconds | 0.88x | 0.69x to 1.19x | 9 |
+| Cr/Ar | tokens | 0.79x | 0.73x to 0.91x | 40 |
+| Cr/Ar | cost | 0.87x | 0.81x to 0.94x | 40 |
+| Cr/Ar | turns | 0.81x | 0.74x to 0.86x | 40 |
+| Cr/Ar | wall_seconds | 0.93x | 0.87x to 1.05x | 40 |
 
 ## cost breakdown
 
@@ -68,13 +68,13 @@ median $ per run for each token class; in brackets, that class's share of the se
 | setup | uncached input | cached input | cache writes | output | median total |
 |---|---|---|---|---|---|
 | A | $0.000 (0.0%) | $0.161 (28.8%) | $0.405 (56.2%) | $0.094 (15.0%) | $0.657 |
-| Ar | $0.000 (0.1%) | $0.320 (44.8%) | $0.364 (42.7%) | $0.083 (12.4%) | $0.757 |
+| Ar | $0.000 (0.1%) | $0.295 (43.2%) | $0.355 (43.4%) | $0.095 (13.3%) | $0.750 |
 | B | $0.000 (0.0%) | $0.170 (29.7%) | $0.383 (55.9%) | $0.087 (14.3%) | $0.650 |
-| Br | $0.000 (0.1%) | $0.173 (36.0%) | $0.325 (51.1%) | $0.073 (12.9%) | $0.704 |
+| Br | $0.000 (0.1%) | $0.240 (39.0%) | $0.341 (47.3%) | $0.086 (13.7%) | $0.666 |
 | C | $0.000 (0.0%) | $0.169 (29.3%) | $0.387 (56.2%) | $0.092 (14.5%) | $0.661 |
-| Cr | $0.000 (0.1%) | $0.198 (38.6%) | $0.335 (47.8%) | $0.098 (13.5%) | $0.604 |
+| Cr | $0.000 (0.1%) | $0.242 (38.8%) | $0.336 (47.6%) | $0.089 (13.6%) | $0.693 |
 
-cache-write tokens are 99.9% of uncached input tokens (median over runs). parse.cost bills both at their own rate, so if codex counts cache writes inside input_tokens, the uncached line double-counts them.
+cache-write tokens are 99.9% of uncached input tokens (median over runs): codex counts cache writes inside input_tokens, and they bill at the cache-write rate instead of the input rate, so the uncached column is what was neither cached nor written.
 
 paired by task against the baseline, per token class:
 
@@ -84,18 +84,18 @@ paired by task against the baseline, per token class:
 | B/A | cached input | 0.94x | 0.90x to 1.06x | 40 |
 | B/A | cache writes | 0.93x | 0.91x to 0.99x | 40 |
 | B/A | output | 0.91x | 0.85x to 0.94x | 40 |
-| Br/Ar | uncached input | 0.88x | 0.72x to 1.20x | 8 |
-| Br/Ar | cached input | 0.75x | 0.58x to 1.06x | 8 |
-| Br/Ar | cache writes | 0.88x | 0.80x to 0.98x | 8 |
-| Br/Ar | output | 0.92x | 0.79x to 1.03x | 8 |
+| Br/Ar | uncached input | 0.89x | 0.80x to 1.00x | 40 |
+| Br/Ar | cached input | 0.81x | 0.70x to 0.94x | 40 |
+| Br/Ar | cache writes | 0.96x | 0.91x to 1.00x | 40 |
+| Br/Ar | output | 0.95x | 0.88x to 1.00x | 40 |
 | C/A | uncached input | 1.08x | 1.03x to 1.12x | 40 |
 | C/A | cached input | 0.98x | 0.89x to 1.06x | 40 |
 | C/A | cache writes | 0.93x | 0.91x to 0.96x | 40 |
 | C/A | output | 0.93x | 0.88x to 0.95x | 40 |
-| Cr/Ar | uncached input | 0.92x | 0.64x to 1.15x | 9 |
-| Cr/Ar | cached input | 0.75x | 0.52x to 1.22x | 9 |
-| Cr/Ar | cache writes | 0.99x | 0.87x to 1.07x | 9 |
-| Cr/Ar | output | 0.94x | 0.74x to 1.17x | 9 |
+| Cr/Ar | uncached input | 0.90x | 0.83x to 1.00x | 40 |
+| Cr/Ar | cached input | 0.78x | 0.71x to 0.92x | 40 |
+| Cr/Ar | cache writes | 0.95x | 0.93x to 1.01x | 40 |
+| Cr/Ar | output | 0.90x | 0.85x to 0.98x | 40 |
 
 ## code mode vs raw tools
 
@@ -103,33 +103,33 @@ same letter, codex's code mode (one `exec` js tool) vs plain function tools. pai
 
 | comparison | metric | value | 95% CI | tasks |
 |---|---|---|---|---|
-| Ar-A | pass_rate | +0.000 | +0.000 to +0.000 | - |
-| Ar/A | tokens | 1.73x | 1.20x to 1.93x | 19 |
-| Ar/A | cost | 1.17x | 1.12x to 1.25x | 19 |
-| Ar/A | turns | 0.79x | 0.70x to 0.83x | 19 |
-| Ar/A | wall_seconds | 1.57x | 1.33x to 1.76x | 19 |
-| Ar/A | cost_uncached | 1.73x | 1.30x to 1.94x | 19 |
-| Ar/A | cost_cached | 1.88x | 1.27x to 2.13x | 19 |
-| Ar/A | cost_cache_write | 0.89x | 0.86x to 0.92x | 19 |
-| Ar/A | cost_output | 1.00x | 0.89x to 1.07x | 19 |
-| Br-B | pass_rate | +0.000 | +0.000 to +0.000 | - |
-| Br/B | tokens | 1.14x | 1.05x to 1.36x | 15 |
-| Br/B | cost | 1.05x | 0.95x to 1.11x | 15 |
-| Br/B | turns | 0.53x | 0.44x to 0.62x | 15 |
-| Br/B | wall_seconds | 1.35x | 1.11x to 1.76x | 15 |
-| Br/B | cost_uncached | 1.24x | 1.11x to 1.36x | 15 |
-| Br/B | cost_cached | 1.19x | 1.08x to 1.41x | 15 |
-| Br/B | cost_cache_write | 0.88x | 0.85x to 0.94x | 15 |
-| Br/B | cost_output | 0.97x | 0.95x to 1.06x | 15 |
-| Cr-C | pass_rate | +0.000 | +0.000 to +0.000 | - |
-| Cr/C | tokens | 1.14x | 1.08x to 1.30x | 17 |
-| Cr/C | cost | 0.97x | 0.94x to 1.09x | 17 |
-| Cr/C | turns | 0.58x | 0.52x to 0.61x | 17 |
-| Cr/C | wall_seconds | 1.22x | 1.19x to 1.40x | 17 |
-| Cr/C | cost_uncached | 1.22x | 1.12x to 1.37x | 17 |
-| Cr/C | cost_cached | 1.20x | 1.12x to 1.35x | 17 |
-| Cr/C | cost_cache_write | 0.87x | 0.85x to 0.93x | 17 |
-| Cr/C | cost_output | 0.96x | 0.89x to 1.02x | 17 |
+| Ar-A | pass_rate | -0.008 | -0.025 to +0.000 | - |
+| Ar/A | tokens | 1.65x | 1.33x to 1.74x | 40 |
+| Ar/A | cost | 1.13x | 1.05x to 1.16x | 40 |
+| Ar/A | turns | 0.80x | 0.71x to 0.84x | 40 |
+| Ar/A | wall_seconds | 1.53x | 1.34x to 1.61x | 40 |
+| Ar/A | cost_uncached | 1.70x | 1.50x to 1.86x | 40 |
+| Ar/A | cost_cached | 1.81x | 1.45x to 1.94x | 40 |
+| Ar/A | cost_cache_write | 0.87x | 0.86x to 0.89x | 40 |
+| Ar/A | cost_output | 0.99x | 0.94x to 1.02x | 40 |
+| Br-B | pass_rate | -0.008 | -0.025 to +0.000 | - |
+| Br/B | tokens | 1.35x | 1.21x to 1.43x | 40 |
+| Br/B | cost | 1.05x | 1.01x to 1.11x | 40 |
+| Br/B | turns | 0.61x | 0.54x to 0.67x | 40 |
+| Br/B | wall_seconds | 1.36x | 1.29x to 1.44x | 40 |
+| Br/B | cost_uncached | 1.37x | 1.28x to 1.47x | 40 |
+| Br/B | cost_cached | 1.40x | 1.25x to 1.54x | 40 |
+| Br/B | cost_cache_write | 0.90x | 0.88x to 0.92x | 40 |
+| Br/B | cost_output | 1.01x | 0.96x to 1.05x | 40 |
+| Cr-C | pass_rate | -0.008 | -0.025 to +0.000 | - |
+| Cr/C | tokens | 1.30x | 1.17x to 1.40x | 40 |
+| Cr/C | cost | 1.03x | 0.97x to 1.09x | 40 |
+| Cr/C | turns | 0.58x | 0.57x to 0.63x | 40 |
+| Cr/C | wall_seconds | 1.37x | 1.23x to 1.46x | 40 |
+| Cr/C | cost_uncached | 1.38x | 1.25x to 1.45x | 40 |
+| Cr/C | cost_cached | 1.36x | 1.21x to 1.47x | 40 |
+| Cr/C | cost_cache_write | 0.88x | 0.86x to 0.92x | 40 |
+| Cr/C | cost_output | 0.97x | 0.93x to 1.02x | 40 |
 
 ## adoption
 
@@ -138,11 +138,11 @@ fallback rate = share of file reads/searches/edits that didn't go through ax; sc
 | setup | runs | runs using ax | median fallback rate | script calls | ax rejections | top ax commands |
 |---|---|---|---|---|---|---|
 | A | 120 | 0 (0.0%) | 100.0% | 26 | 0 | - |
-| Ar | 19 | 0 (0.0%) | 100.0% | 8 | 0 | - |
+| Ar | 40 | 0 (0.0%) | 100.0% | 10 | 0 | - |
 | B | 120 | 120 (100.0%) | 0.1% | 2 | 0 | edit 381, read 377, find 187, diff 159 |
-| Br | 15 | 15 (100.0%) | 0.8% | 0 | 0 | read 49, edit 46, find 35, diff 26 |
+| Br | 40 | 40 (100.0%) | 0.7% | 1 | 0 | read 144, edit 134, find 79, diff 66 |
 | C | 120 | 120 (100.0%) | 1.2% | 3 | 4 | edit 391, read 370, find 181, diff 161 |
-| Cr | 17 | 17 (100.0%) | 1.3% | 0 | 0 | read 67, edit 58, find 33, diff 29 |
+| Cr | 40 | 40 (100.0%) | 0.6% | 0 | 1 | read 139, edit 135, find 82, diff 61 |
 
 ## wins and losses
 
@@ -204,40 +204,45 @@ top 3 tasks per metric, by per-task ratio (or pass-rate delta) against the basel
 
 - wins:
   - `hono-5110`: A 358,752, Br 194,039 (0.54x); runs [Ar0](../runs/20260927T143721-hono-5110-Ar-r0-8cb4/events.jsonl) [Br0](../runs/20260927T144004-hono-5110-Br-r0-f56c/events.jsonl)
-  - `hono-5099`: A 706,339, Br 421,382 (0.60x); runs [Ar0](../runs/20260927T143238-hono-5099-Ar-r0-63ce/events.jsonl) [Br0](../runs/20260927T143923-hono-5099-Br-r0-cf0f/events.jsonl)
-  - `hono-5209`: A 255,591, Br 165,966 (0.65x); runs [Ar0](../runs/20260927T143943-hono-5209-Ar-r0-e57f/events.jsonl) [Br0](../runs/20260927T142800-hono-5209-Br-r0-4380/events.jsonl)
+  - `hono-5179`: A 1,685,722, Br 966,607 (0.57x); runs [Ar0](../runs/20260927T142952-hono-5179-Ar-r0-bc71/events.jsonl) [Br0](../runs/20260927T145805-hono-5179-Br-r0-8c33/events.jsonl)
+  - `hono-5102`: A 412,699, Br 243,053 (0.59x); runs [Ar0](../runs/20260927T145506-hono-5102-Ar-r0-7912/events.jsonl) [Br0](../runs/20260927T145351-hono-5102-Br-r0-6482/events.jsonl)
 - losses:
+  - `hono-5138`: A 190,743, Br 272,614 (1.43x); runs [Ar0](../runs/20260927T143028-hono-5138-Ar-r0-7786/events.jsonl) [Br0](../runs/20260927T144928-hono-5138-Br-r0-5352/events.jsonl)
   - `hono-5272`: A 201,952, Br 281,971 (1.40x); runs [Ar0](../runs/20260927T142626-hono-5272-Ar-r0-0f7d/events.jsonl) [Br0](../runs/20260927T142420-hono-5272-Br-r0-b5ce/events.jsonl)
-  - `hono-5197`: A 148,830, Br 151,274 (1.02x); runs [Ar0](../runs/20260927T144138-hono-5197-Ar-r0-3731/events.jsonl) [Br0](../runs/20260927T143718-hono-5197-Br-r0-b822/events.jsonl)
+  - `hono-5137`: A 858,072, Br 1,014,955 (1.18x); runs [Ar0](../runs/20260927T143222-hono-5137-Ar-r0-91ef/events.jsonl) [Br0](../runs/20260927T150034-hono-5137-Br-r0-6f27/events.jsonl)
 
 ### Br vs Ar: cost
 
 - wins:
-  - `hono-5197`: A $0.692, Br $0.408 (0.59x); runs [Ar0](../runs/20260927T144138-hono-5197-Ar-r0-3731/events.jsonl) [Br0](../runs/20260927T143718-hono-5197-Br-r0-b822/events.jsonl)
+  - `hono-5179`: A $2.825, Br $1.900 (0.67x); runs [Ar0](../runs/20260927T142952-hono-5179-Ar-r0-bc71/events.jsonl) [Br0](../runs/20260927T145805-hono-5179-Br-r0-8c33/events.jsonl)
   - `hono-5110`: A $0.706, Br $0.492 (0.70x); runs [Ar0](../runs/20260927T143721-hono-5110-Ar-r0-8cb4/events.jsonl) [Br0](../runs/20260927T144004-hono-5110-Br-r0-f56c/events.jsonl)
   - `hono-5099`: A $1.229, Br $0.875 (0.71x); runs [Ar0](../runs/20260927T143238-hono-5099-Ar-r0-63ce/events.jsonl) [Br0](../runs/20260927T143923-hono-5099-Br-r0-cf0f/events.jsonl)
 - losses:
   - `hono-5272`: A $0.558, Br $0.704 (1.26x); runs [Ar0](../runs/20260927T142626-hono-5272-Ar-r0-0f7d/events.jsonl) [Br0](../runs/20260927T142420-hono-5272-Br-r0-b5ce/events.jsonl)
+  - `hono-5138`: A $0.490, Br $0.592 (1.21x); runs [Ar0](../runs/20260927T143028-hono-5138-Ar-r0-7786/events.jsonl) [Br0](../runs/20260927T144928-hono-5138-Br-r0-5352/events.jsonl)
+  - `hono-5380`: A $0.931, Br $1.031 (1.11x); runs [Ar0](../runs/20260927T145220-hono-5380-Ar-r0-1d83/events.jsonl) [Br0](../runs/20260927T143718-hono-5380-Br-r0-003e/events.jsonl)
 
 ### Br vs Ar: turns
 
 - wins:
-  - `hono-5110`: A 11, Br 6 (0.55x); runs [Ar0](../runs/20260927T143721-hono-5110-Ar-r0-8cb4/events.jsonl) [Br0](../runs/20260927T144004-hono-5110-Br-r0-f56c/events.jsonl)
-  - `hono-5099`: A 16, Br 9 (0.56x); runs [Ar0](../runs/20260927T143238-hono-5099-Ar-r0-63ce/events.jsonl) [Br0](../runs/20260927T143923-hono-5099-Br-r0-cf0f/events.jsonl)
-  - `hono-5292`: A 12, Br 7 (0.58x); runs [Ar0](../runs/20260927T142951-hono-5292-Ar-r0-89da/events.jsonl) [Br0](../runs/20260927T142828-hono-5292-Br-r0-d98c/events.jsonl)
+  - `hono-5246`: A 10, Br 5 (0.50x); runs [Ar0](../runs/20260927T150744-hono-5246-Ar-r0-02df/events.jsonl) [Br0](../runs/20260927T144128-hono-5246-Br-r0-3a8e/events.jsonl)
+  - `hono-5215`: A 13, Br 7 (0.54x); runs [Ar0](../runs/20260927T145415-hono-5215-Ar-r0-4459/events.jsonl) [Br0](../runs/20260927T150316-hono-5215-Br-r0-b5ee/events.jsonl)
+  - `hono-5102`: A 11, Br 6 (0.55x); runs [Ar0](../runs/20260927T145506-hono-5102-Ar-r0-7912/events.jsonl) [Br0](../runs/20260927T145351-hono-5102-Br-r0-6482/events.jsonl)
 - losses:
+  - `hono-5137`: A 17, Br 20 (1.18x); runs [Ar0](../runs/20260927T143222-hono-5137-Ar-r0-91ef/events.jsonl) [Br0](../runs/20260927T150034-hono-5137-Br-r0-6f27/events.jsonl)
+  - `hono-5138`: A 7, Br 8 (1.14x); runs [Ar0](../runs/20260927T143028-hono-5138-Ar-r0-7786/events.jsonl) [Br0](../runs/20260927T144928-hono-5138-Br-r0-5352/events.jsonl)
   - `hono-5272`: A 7, Br 8 (1.14x); runs [Ar0](../runs/20260927T142626-hono-5272-Ar-r0-0f7d/events.jsonl) [Br0](../runs/20260927T142420-hono-5272-Br-r0-b5ce/events.jsonl)
 
 ### Br vs Ar: wall_seconds
 
 - wins:
+  - `hono-5215`: A 137.0, Br 84.0 (0.61x); runs [Ar0](../runs/20260927T145415-hono-5215-Ar-r0-4459/events.jsonl) [Br0](../runs/20260927T150316-hono-5215-Br-r0-b5ee/events.jsonl)
   - `hono-5209`: A 87.0, Br 55.0 (0.63x); runs [Ar0](../runs/20260927T143943-hono-5209-Ar-r0-e57f/events.jsonl) [Br0](../runs/20260927T142800-hono-5209-Br-r0-4380/events.jsonl)
   - `hono-5110`: A 122.0, Br 79.0 (0.65x); runs [Ar0](../runs/20260927T143721-hono-5110-Ar-r0-8cb4/events.jsonl) [Br0](../runs/20260927T144004-hono-5110-Br-r0-f56c/events.jsonl)
-  - `hono-5292`: A 85.0, Br 63.0 (0.74x); runs [Ar0](../runs/20260927T142951-hono-5292-Ar-r0-89da/events.jsonl) [Br0](../runs/20260927T142828-hono-5292-Br-r0-d98c/events.jsonl)
 - losses:
   - `hono-5197`: A 42.0, Br 71.0 (1.69x); runs [Ar0](../runs/20260927T144138-hono-5197-Ar-r0-3731/events.jsonl) [Br0](../runs/20260927T143718-hono-5197-Br-r0-b822/events.jsonl)
-  - `hono-5272`: A 58.0, Br 75.0 (1.29x); runs [Ar0](../runs/20260927T142626-hono-5272-Ar-r0-0f7d/events.jsonl) [Br0](../runs/20260927T142420-hono-5272-Br-r0-b5ce/events.jsonl)
-  - `hono-5033`: A 72.0, Br 78.0 (1.08x); runs [Ar0](../runs/20260927T142839-hono-5033-Ar-r0-f10b/events.jsonl) [Br0](../runs/20260927T142438-hono-5033-Br-r0-a66f/events.jsonl)
+  - `hono-5138`: A 59.0, Br 93.0 (1.58x); runs [Ar0](../runs/20260927T143028-hono-5138-Ar-r0-7786/events.jsonl) [Br0](../runs/20260927T144928-hono-5138-Br-r0-5352/events.jsonl)
+  - `hono-5059`: A 44.0, Br 61.0 (1.39x); runs [Ar0](../runs/20260927T150440-hono-5059-Ar-r0-8eb0/events.jsonl) [Br0](../runs/20260927T145811-hono-5059-Br-r0-30f8/events.jsonl)
 
 ### C vs A: resolved
 
@@ -295,43 +300,45 @@ top 3 tasks per metric, by per-task ratio (or pass-rate delta) against the basel
 
 - wins:
   - `hono-5426`: A 367,128, Cr 148,327 (0.40x); runs [Ar0](../runs/20260927T143843-hono-5426-Ar-r0-a3bd/events.jsonl) [Cr0](../runs/20260927T142223-hono-5426-Cr-r0-0e43/events.jsonl)
+  - `hono-5110`: A 358,752, Cr 195,102 (0.54x); runs [Ar0](../runs/20260927T143721-hono-5110-Ar-r0-8cb4/events.jsonl) [Cr0](../runs/20260927T150852-hono-5110-Cr-r0-3299/events.jsonl)
   - `hono-5255`: A 322,084, Cr 180,646 (0.56x); runs [Ar0](../runs/20260927T143829-hono-5255-Ar-r0-91ae/events.jsonl) [Cr0](../runs/20260927T142321-hono-5255-Cr-r0-e1b4/events.jsonl)
-  - `hono-5292`: A 385,899, Cr 233,308 (0.60x); runs [Ar0](../runs/20260927T142951-hono-5292-Ar-r0-89da/events.jsonl) [Cr0](../runs/20260927T142547-hono-5292-Cr-r0-95b3/events.jsonl)
 - losses:
+  - `hono-5272`: A 201,952, Cr 332,633 (1.65x); runs [Ar0](../runs/20260927T142626-hono-5272-Ar-r0-0f7d/events.jsonl) [Cr0](../runs/20260927T144222-hono-5272-Cr-r0-a1cf/events.jsonl)
+  - `hono-5197`: A 148,830, Cr 228,269 (1.53x); runs [Ar0](../runs/20260927T144138-hono-5197-Ar-r0-3731/events.jsonl) [Cr0](../runs/20260927T145108-hono-5197-Cr-r0-66ac/events.jsonl)
   - `hono-5137`: A 858,072, Cr 1,096,965 (1.28x); runs [Ar0](../runs/20260927T143222-hono-5137-Ar-r0-91ef/events.jsonl) [Cr0](../runs/20260927T143502-hono-5137-Cr-r0-23f3/events.jsonl)
-  - `hono-5424`: A 235,900, Cr 288,219 (1.22x); runs [Ar0](../runs/20260927T142646-hono-5424-Ar-r0-653a/events.jsonl) [Cr0](../runs/20260927T142909-hono-5424-Cr-r0-748c/events.jsonl)
-  - `hono-5138`: A 190,743, Cr 221,325 (1.16x); runs [Ar0](../runs/20260927T143028-hono-5138-Ar-r0-7786/events.jsonl) [Cr0](../runs/20260927T142437-hono-5138-Cr-r0-ccc3/events.jsonl)
 
 ### Cr vs Ar: cost
 
 - wins:
   - `hono-5426`: A $0.770, Cr $0.455 (0.59x); runs [Ar0](../runs/20260927T143843-hono-5426-Ar-r0-a3bd/events.jsonl) [Cr0](../runs/20260927T142223-hono-5426-Cr-r0-0e43/events.jsonl)
+  - `hono-5264`: A $1.007, Cr $0.686 (0.68x); runs [Ar0](../runs/20260927T151024-hono-5264-Ar-r0-0f56/events.jsonl) [Cr0](../runs/20260927T143538-hono-5264-Cr-r0-2d9c/events.jsonl)
   - `hono-5292`: A $0.825, Cr $0.604 (0.73x); runs [Ar0](../runs/20260927T142951-hono-5292-Ar-r0-89da/events.jsonl) [Cr0](../runs/20260927T142547-hono-5292-Cr-r0-95b3/events.jsonl)
-  - `hono-5179`: A $2.825, Cr $2.133 (0.76x); runs [Ar0](../runs/20260927T142952-hono-5179-Ar-r0-bc71/events.jsonl) [Cr0](../runs/20260927T142325-hono-5179-Cr-r0-6e50/events.jsonl)
 - losses:
+  - `hono-5272`: A $0.558, Cr $0.743 (1.33x); runs [Ar0](../runs/20260927T142626-hono-5272-Ar-r0-0f7d/events.jsonl) [Cr0](../runs/20260927T144222-hono-5272-Cr-r0-a1cf/events.jsonl)
   - `hono-5424`: A $0.640, Cr $0.785 (1.23x); runs [Ar0](../runs/20260927T142646-hono-5424-Ar-r0-653a/events.jsonl) [Cr0](../runs/20260927T142909-hono-5424-Cr-r0-748c/events.jsonl)
   - `hono-5137`: A $1.626, Cr $1.862 (1.14x); runs [Ar0](../runs/20260927T143222-hono-5137-Ar-r0-91ef/events.jsonl) [Cr0](../runs/20260927T143502-hono-5137-Cr-r0-23f3/events.jsonl)
-  - `hono-5138`: A $0.490, Cr $0.525 (1.07x); runs [Ar0](../runs/20260927T143028-hono-5138-Ar-r0-7786/events.jsonl) [Cr0](../runs/20260927T142437-hono-5138-Cr-r0-ccc3/events.jsonl)
 
 ### Cr vs Ar: turns
 
 - wins:
+  - `hono-5264`: A 15, Cr 8 (0.53x); runs [Ar0](../runs/20260927T151024-hono-5264-Ar-r0-0f56/events.jsonl) [Cr0](../runs/20260927T143538-hono-5264-Cr-r0-2d9c/events.jsonl)
+  - `hono-5268`: A 9, Cr 5 (0.56x); runs [Ar0](../runs/20260927T145912-hono-5268-Ar-r0-62c1/events.jsonl) [Cr0](../runs/20260927T150257-hono-5268-Cr-r0-aa11/events.jsonl)
   - `hono-5292`: A 12, Cr 7 (0.58x); runs [Ar0](../runs/20260927T142951-hono-5292-Ar-r0-89da/events.jsonl) [Cr0](../runs/20260927T142547-hono-5292-Cr-r0-95b3/events.jsonl)
-  - `hono-5426`: A 10, Cr 6 (0.60x); runs [Ar0](../runs/20260927T143843-hono-5426-Ar-r0-a3bd/events.jsonl) [Cr0](../runs/20260927T142223-hono-5426-Cr-r0-0e43/events.jsonl)
-  - `hono-5255`: A 8, Cr 6 (0.75x); runs [Ar0](../runs/20260927T143829-hono-5255-Ar-r0-91ae/events.jsonl) [Cr0](../runs/20260927T142321-hono-5255-Cr-r0-e1b4/events.jsonl)
 - losses:
+  - `hono-5288`: A 9, Cr 11 (1.22x); runs [Ar0](../runs/20260927T145639-hono-5288-Ar-r0-504f/events.jsonl) [Cr0](../runs/20260927T150125-hono-5288-Cr-r0-fdec/events.jsonl)
   - `hono-5137`: A 17, Cr 20 (1.18x); runs [Ar0](../runs/20260927T143222-hono-5137-Ar-r0-91ef/events.jsonl) [Cr0](../runs/20260927T143502-hono-5137-Cr-r0-23f3/events.jsonl)
+  - `hono-5197`: A 6, Cr 7 (1.17x); runs [Ar0](../runs/20260927T144138-hono-5197-Ar-r0-3731/events.jsonl) [Cr0](../runs/20260927T145108-hono-5197-Cr-r0-66ac/events.jsonl)
 
 ### Cr vs Ar: wall_seconds
 
 - wins:
+  - `hono-5256`: A 161.0, Cr 89.0 (0.55x); runs [Ar0](../runs/20260927T145632-hono-5256-Ar-r0-eb92/events.jsonl) [Cr0](../runs/20260927T142659-hono-5256-Cr-r0-6aad/events.jsonl)
+  - `hono-5110`: A 122.0, Cr 68.0 (0.56x); runs [Ar0](../runs/20260927T143721-hono-5110-Ar-r0-8cb4/events.jsonl) [Cr0](../runs/20260927T150852-hono-5110-Cr-r0-3299/events.jsonl)
   - `hono-5426`: A 91.0, Cr 58.0 (0.64x); runs [Ar0](../runs/20260927T143843-hono-5426-Ar-r0-a3bd/events.jsonl) [Cr0](../runs/20260927T142223-hono-5426-Cr-r0-0e43/events.jsonl)
-  - `hono-5292`: A 85.0, Cr 59.0 (0.69x); runs [Ar0](../runs/20260927T142951-hono-5292-Ar-r0-89da/events.jsonl) [Cr0](../runs/20260927T142547-hono-5292-Cr-r0-95b3/events.jsonl)
-  - `hono-5179`: A 292.0, Cr 214.0 (0.73x); runs [Ar0](../runs/20260927T142952-hono-5179-Ar-r0-bc71/events.jsonl) [Cr0](../runs/20260927T142325-hono-5179-Cr-r0-6e50/events.jsonl)
 - losses:
-  - `hono-5033`: A 72.0, Cr 91.0 (1.26x); runs [Ar0](../runs/20260927T142839-hono-5033-Ar-r0-f10b/events.jsonl) [Cr0](../runs/20260927T143547-hono-5033-Cr-r0-c9ec/events.jsonl)
-  - `hono-5138`: A 59.0, Cr 70.0 (1.19x); runs [Ar0](../runs/20260927T143028-hono-5138-Ar-r0-7786/events.jsonl) [Cr0](../runs/20260927T142437-hono-5138-Cr-r0-ccc3/events.jsonl)
-  - `hono-5424`: A 74.0, Cr 79.0 (1.07x); runs [Ar0](../runs/20260927T142646-hono-5424-Ar-r0-653a/events.jsonl) [Cr0](../runs/20260927T142909-hono-5424-Cr-r0-748c/events.jsonl)
+  - `hono-5380`: A 108.0, Cr 409.0 (3.79x); runs [Ar0](../runs/20260927T145220-hono-5380-Ar-r0-1d83/events.jsonl) [Cr0](../runs/20260927T144225-hono-5380-Cr-r0-63ef/events.jsonl)
+  - `hono-5197`: A 42.0, Cr 79.0 (1.88x); runs [Ar0](../runs/20260927T144138-hono-5197-Ar-r0-3731/events.jsonl) [Cr0](../runs/20260927T145108-hono-5197-Cr-r0-66ac/events.jsonl)
+  - `hono-5272`: A 58.0, Cr 80.0 (1.38x); runs [Ar0](../runs/20260927T142626-hono-5272-Ar-r0-0f7d/events.jsonl) [Cr0](../runs/20260927T144222-hono-5272-Cr-r0-a1cf/events.jsonl)
 
 ## verdict
 
@@ -347,10 +354,10 @@ rule: a metric counts as helped or hurt only when its 95% CI excludes no change 
   - wall_seconds: no measurable difference. median 1.02x of A, 95% CI 0.98x to 1.08x
 - **Br vs Ar**
   - pass rate: no measurable difference. +0.0 pp vs A, 95% CI +0.0 to +0.0 pp
-  - tokens: no measurable difference. median 0.77x of A, 95% CI 0.60x to 1.02x
-  - cost: helped. median 0.79x of A, 95% CI 0.70x to 0.89x
-  - turns: helped. median 0.82x of A, 95% CI 0.56x to 0.88x
-  - wall_seconds: no measurable difference. median 0.89x of A, 95% CI 0.65x to 1.29x
+  - tokens: helped. median 0.83x of A, 95% CI 0.73x to 0.93x
+  - cost: helped. median 0.89x of A, 95% CI 0.85x to 0.96x
+  - turns: helped. median 0.80x of A, 95% CI 0.71x to 0.89x
+  - wall_seconds: no measurable difference. median 0.98x of A, 95% CI 0.86x to 1.04x
 - **C vs A**
   - pass rate: no measurable difference. +0.0 pp vs A, 95% CI +0.0 to +0.0 pp
   - tokens: no measurable difference. median 0.98x of A, 95% CI 0.89x to 1.03x
@@ -359,10 +366,10 @@ rule: a metric counts as helped or hurt only when its 95% CI excludes no change 
   - wall_seconds: no measurable difference. median 1.04x of A, 95% CI 0.97x to 1.08x
 - **Cr vs Ar**
   - pass rate: no measurable difference. +0.0 pp vs A, 95% CI +0.0 to +0.0 pp
-  - tokens: no measurable difference. median 0.77x of A, 95% CI 0.56x to 1.22x
-  - cost: no measurable difference. median 0.86x of A, 95% CI 0.73x to 1.14x
-  - turns: no measurable difference. median 0.80x of A, 95% CI 0.60x to 1.00x
-  - wall_seconds: no measurable difference. median 0.88x of A, 95% CI 0.69x to 1.19x
+  - tokens: helped. median 0.79x of A, 95% CI 0.73x to 0.91x
+  - cost: helped. median 0.87x of A, 95% CI 0.81x to 0.94x
+  - turns: helped. median 0.81x of A, 95% CI 0.74x to 0.86x
+  - wall_seconds: no measurable difference. median 0.93x of A, 95% CI 0.87x to 1.05x
 
 ## limitations
 
