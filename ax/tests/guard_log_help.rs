@@ -126,6 +126,12 @@ fn agent_help_note_and_env() {
     assert!(out.starts_with("## ax\n"));
     assert!(out.contains("not type-aware"));
     assert!(out.contains("@@ replace 12:a3f1..15:9c2e"));
+    // the benchmark hands agents eval/setups/AGENTS.ax.md, so it has to be the same note
+    assert_eq!(
+        ax::help::NOTE,
+        include_str!("../../eval/setups/AGENTS.ax.md")
+    );
+    assert!(out.starts_with(ax::help::NOTE));
     let env = stdout(&ax(t.path(), &["agent-help", "--env"]));
     for k in [
         "AX_NO_CAPS",

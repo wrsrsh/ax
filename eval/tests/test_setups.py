@@ -96,4 +96,9 @@ def test_notes_token_parity():
     except Exception as e:  # encoding not cached and no network
         pytest.skip(str(e))
     a, b = len(enc.encode(agents_md("A"))), len(enc.encode(agents_md("B")))
-    assert abs(a - b) <= 0.05 * max(a, b), (a, b)
+    assert a == b, (a, b)
+
+
+def test_ax_note_leaves_agents_md_alone():
+    # agents already burn calls on `ax find AGENTS.md`, don't nudge them further
+    assert "AGENTS.md" not in agents_md("B")
