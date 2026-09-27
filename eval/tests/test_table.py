@@ -26,7 +26,7 @@ def test_cost_parts_derived_for_old_metrics(tmp_path):
            "cache_write_input_tokens": 500_000, "output_tokens": 100_000, "cost": 9.9}
     prices = {"input": 10.0, "cached_input": 1.0, "cache_write": 12.5, "output": 50.0}
     r = row(run_dir(tmp_path, {"run_id": "old", "task": "hono-9", "setup": "B", "agent": "codex"}, old), prices=prices)
-    assert (r["cost_uncached"], r["cost_cached"], r["cost_cache_write"], r["cost_output"]) == (10.0, 2.0, 6.25, 5.0)
+    assert (r["cost_uncached"], r["cost_cached"], r["cost_cache_write"], r["cost_output"]) == (5.0, 2.0, 6.25, 5.0)
     assert r["cost"] == 9.9  # the recorded total stays as it was
     new = dict(old, cost_uncached=1.0, cost_cached=2.0, cost_cache_write=3.0, cost_output=4.0)
     r = row(run_dir(tmp_path, {"run_id": "new", "task": "hono-9", "setup": "B", "agent": "codex"}, new), prices=prices)

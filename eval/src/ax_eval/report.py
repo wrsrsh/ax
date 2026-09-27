@@ -264,9 +264,9 @@ def cost_breakdown(rows: list[dict], setups: list[str], ratios: dict) -> list[st
     shares = [r["cache_write_input_tokens"] / r["uncached_input_tokens"] for r in rows
               if r.get("cache_write_input_tokens") is not None and r.get("uncached_input_tokens")]
     if shares:
-        L += [(f"cache-write tokens are {pct(median(shares))} of uncached input tokens (median over runs). "
-               "parse.cost bills both at their own rate, so if codex counts cache writes inside input_tokens, "
-               "the uncached line double-counts them."), ""]
+        L += [(f"cache-write tokens are {pct(median(shares))} of uncached input tokens (median over runs): codex counts cache writes "
+               "inside input_tokens, and they bill at the cache-write rate instead of the input rate, so the uncached column "
+               "is what was neither cached nor written."), ""]
     body = []
     for comp, ms in sorted(ratios.items()):
         for k, label in PART_LABELS.items():
@@ -277,12 +277,12 @@ def cost_breakdown(rows: list[dict], setups: list[str], ratios: dict) -> list[st
     return L
 
 
-def render(rows: list[dict], runs_dir: Path = RUNS, out: Path = REPORT / "REPORT.md", tasks: Path = TASKS / "final.jsonl", subset: str | None = "heldout") -> str:
+def render(rows: list[dict], runs_dir: Path = RUNS, out: Path = REPORT / "REPORT.md", tasks: Path = TASKS / "final.jsonl", subset: str | None = "heldout", model: str | None = "gpt-6-astra") -> str:
     """`subset` picks the rows the numbers are computed from (default held-out only;
     None for everything). dry runs (stub, fake api) never count."""
     real = [r for r in rows if not r.get("dry")]
     allgood = [r for r in rows if usable(r)]
-    good = [r for r in allgood if subset is None or r.get("split") == subset]
+    good = [r for r in allgood if (subset is None or r.get("split") == subset) and (model is None or r.get("model") == model)]
     infra = [r for r in real if r.get("infra_failure")]
     incomplete = [r for r in real if not r.get("complete") and not r.get("infra_failure")]
     s, source = summary(good)
@@ -309,7 +309,7 @@ def render(rows: list[dict], runs_dir: Path = RUNS, out: Path = REPORT / "REPORT
         ),
         (
             f"- runs: {len(real)} real ({len(rows) - len(real)} dry runs ignored), {len(allgood)} usable, "
-            f"{len(good)} in this report ({subset or 'all'} split), {len(infra)} infra failures, {len(incomplete)} incomplete, "
+            f"{len(good)} in this report ({subset or 'all'} split, model {model or 'any'}), {len(infra)} infra failures, {len(incomplete)} incomplete, "
             f"{sum(bool(r.get('timed_out')) for r in good)} timed out (counted as unresolved)"
         ),
         f"- setups: {', '.join(setups) or 'none'}. A is the baseline (Ar for the raw-tools family); ratios and deltas are paired by task against it.",
@@ -413,11 +413,12 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--tasks", type=Path, default=TASKS / "final.jsonl")
     p.add_argument("--no-collect", action="store_true", help="use the existing runs.jsonl as is")
     p.add_argument("--split", default="heldout", choices=("heldout", "dev", "all"))
+    p.add_argument("--model", default="gpt-6-astra", help="model to report on, or all")
     a = p.parse_args(argv)
     if not a.no_collect:
         collect(a.runs, a.out.parent, a.tasks)
     rows = load(a.runs)
-    render(rows, a.runs, a.out, a.tasks, None if a.split == "all" else a.split)
+    render(rows, a.runs, a.out, a.tasks, None if a.split == "all" else a.split, None if a.model == "all" else a.model)
     print(f"wrote {a.out} ({len(rows)} runs)")
     return 0
 

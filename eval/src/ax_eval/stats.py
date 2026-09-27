@@ -221,11 +221,12 @@ def main(argv=None) -> int:
     p.add_argument("--seed", type=int, default=SEED)
     p.add_argument("--boot", type=int, default=N_BOOT)
     p.add_argument("--split", default="heldout", choices=("heldout", "dev", "all"))
+    p.add_argument("--model", default="gpt-6-astra", help="model to report on, or all")
     a = p.parse_args(argv)
     if not a.runs.exists():
         print(f"no runs file at {a.runs}", file=sys.stderr)
         return 1
-    rows = [r for r in jsonl(a.runs) if a.split == "all" or r.get("split") == a.split]
+    rows = [r for r in jsonl(a.runs) if (a.split == "all" or r.get("split") == a.split) and (a.model == "all" or r.get("model") == a.model)]
     print(json.dumps(summary(rows, a.boot, a.seed), indent=2))
     return 0
 

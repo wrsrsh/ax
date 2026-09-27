@@ -92,14 +92,15 @@ def test_cost_formula():
     row = {"uncached_input_tokens": 1_000_000, "cached_input_tokens": 1_000_000, "output_tokens": 1_000_000}
     assert cost(row, {"input": 1, "cached_input": 0.1, "output": 4}) == 5.1
     row["cache_write_input_tokens"] = 1_000_000
-    assert cost(row, {"input": 1, "cached_input": 0.1, "cache_write": 1.25, "output": 4}) == 6.35
+    assert cost(row, {"input": 1, "cached_input": 0.1, "cache_write": 1.25, "output": 4}) == 5.35  # written tokens bill at 1.25, not 1 + 1.25
 
 
 def test_cost_parts_sum_to_cost():
     row = {"uncached_input_tokens": 1_000_000, "cached_input_tokens": 2_000_000, "cache_write_input_tokens": 1_000_000, "output_tokens": 3_000_000}
     prices = {"input": 1, "cached_input": 0.1, "cache_write": 1.25, "output": 4}
     parts = cost_parts(row, prices)
-    assert parts == {"cost_uncached": 1.0, "cost_cached": 0.2, "cost_cache_write": 1.25, "cost_output": 12.0}
+    # every uncached token was a cache write here, so nothing bills at the plain input rate
+    assert parts == {"cost_uncached": 0.0, "cost_cached": 0.2, "cost_cache_write": 1.25, "cost_output": 12.0}
     assert abs(sum(parts.values()) - cost(row, prices)) < 1e-12
     # old rows without cache writes, and prices without a cache_write rate
     assert cost_parts({"uncached_input_tokens": 1, "cached_input_tokens": 0, "output_tokens": 0}, {"input": 1e6, "cached_input": 0, "output": 0})["cost_cache_write"] == 0

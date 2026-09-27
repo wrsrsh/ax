@@ -48,7 +48,7 @@ def fake(tmp_path, monkeypatch):
     # these tests pin the built-in fallback, not ax_eval.stats
     monkeypatch.setattr(report, "summary", lambda rows: (fallback_summary(rows), "built-in fallback"))
     # metrics.json here has no cost split, so the table derives it from these
-    monkeypatch.setattr(table, "load_prices", lambda: {"input": 2.0, "cached_input": 1.0, "cache_write": 0.0, "output": 10.0})
+    monkeypatch.setattr(table, "load_prices", lambda **kw: {"input": 2.0, "cached_input": 1.0, "cache_write": 0.0, "output": 10.0})
     runs = tmp_path / "runs"
     for setup, (scale, solved) in PLAN.items():
         for task in TASKS:
@@ -125,14 +125,15 @@ def test_report_renders(fake):
     assert "tokens: helped" in verdict and "cost: helped" in verdict
     assert verdict.count("no measurable difference") >= 5  # every C metric + B pass rate
     assert "stats: built-in fallback." in md
-    # A: uncached 10k*k*$2, cached 5k*k*$1, output 1k*k*$10 per million -> 40/20/0/40 split, median over tasks 1-4
+    # A: 10k*k uncached of which 5k*k are cache writes (billed at $0 here), so 5k*k*$2 plain input,
+    # cached 5k*k*$1, output 1k*k*$10 per million -> 25/25/0/50 split, median over tasks 1-4
     costs = md.split("## cost breakdown")[1].split("## ")[0]
-    assert "| A | $0.025 (40.0%) |" in costs and "| $0.000 (0.0%) | $0.025 (40.0%) | $0.025 |" in costs
+    assert "| A | $0.013 (25.0%) | $0.013 (25.0%) | $0.000 (0.0%) | $0.025 (50.0%) | $0.025 |" in costs
     assert "cache-write tokens are 50.0% of uncached input tokens" in costs
     assert "| B/A | cached input | 0.70x |" in costs and "| C/A | output | 1.00x |" in costs
     # the default report is the held-out split only
     held = render(rows, runs, out, tasks)
-    assert "3 with usable runs here" in held and "(heldout split)" in held
+    assert "3 with usable runs here" in held and "(heldout split, model gpt-6-astra)" in held
 
 
 def test_cli(fake, monkeypatch):

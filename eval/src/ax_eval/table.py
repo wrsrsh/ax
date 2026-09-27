@@ -141,8 +141,16 @@ def collect(runs_dir: Path = RUNS, report_dir: Path | None = None, tasks: Path =
     report_dir = Path(report_dir) if report_dir else runs_dir.parent / "report"
     split = splits(tasks)
     dirs = sorted(d for d in runs_dir.iterdir() if d.is_dir() and not d.name.startswith(".")) if runs_dir.exists() else []
-    prices = load_prices()
-    rows = [row(d, split, prices) for d in dirs]
+    prices: dict[str, dict] = {}
+
+    def priced(d: Path) -> dict:
+        m = _load(d / "manifest.json") or {}
+        model = m.get("model") or "gpt-6-astra"
+        if model not in prices:
+            prices[model] = load_prices(model=model)
+        return row(d, split, prices[model])
+
+    rows = [priced(d) for d in dirs]
 
     runs_dir.mkdir(parents=True, exist_ok=True)
     with (runs_dir / "runs.jsonl").open("w") as f:

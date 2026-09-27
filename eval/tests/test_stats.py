@@ -182,7 +182,7 @@ def test_summary_and_main(tmp_path, capsys):
     assert s["guardrail"]["verdict"].startswith("B not worse")
     p = tmp_path / "runs.jsonl"
     p.write_text("\n".join(json.dumps(r) for r in rows) + "\n")
-    assert main([str(p), "--boot", str(B), "--split", "all"]) == 0
+    assert main([str(p), "--boot", str(B), "--split", "all", "--model", "all"]) == 0
     assert json.loads(capsys.readouterr().out) == json.loads(json.dumps(s))
     assert main([str(tmp_path / "nope.jsonl")]) == 1
 

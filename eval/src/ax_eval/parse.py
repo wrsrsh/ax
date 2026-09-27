@@ -148,13 +148,9 @@ def fallback_rate(tools: dict) -> float | None:
 
 
 def cost(row: dict, prices: dict) -> float:
-    """prices in $ per 1M tokens: input, cached_input, cache_write, output (reasoning is billed as output)."""
-    return (
-        row["uncached_input_tokens"] * prices["input"]
-        + row["cached_input_tokens"] * prices["cached_input"]
-        + row.get("cache_write_input_tokens", 0) * prices.get("cache_write", 0)
-        + row["output_tokens"] * prices["output"]
-    ) / 1e6
+    """prices in $ per 1M tokens: input, cached_input, cache_write, output (reasoning is billed as output).
+    cache-write tokens are part of input_tokens and bill at the cache-write rate instead of the input rate."""
+    return sum(cost_parts(row, prices).values())
 
 
 COST_PARTS = ("cost_uncached", "cost_cached", "cost_cache_write", "cost_output")
@@ -162,10 +158,11 @@ COST_PARTS = ("cost_uncached", "cost_cached", "cost_cache_write", "cost_output")
 
 def cost_parts(row: dict, prices: dict) -> dict:
     """cost() split by token class, same prices, sums to cost() (up to float rounding)."""
+    written = row.get("cache_write_input_tokens") or 0
     return {
-        "cost_uncached": row["uncached_input_tokens"] * prices["input"] / 1e6,
+        "cost_uncached": max(row["uncached_input_tokens"] - written, 0) * prices["input"] / 1e6,
         "cost_cached": row["cached_input_tokens"] * prices["cached_input"] / 1e6,
-        "cost_cache_write": (row.get("cache_write_input_tokens") or 0) * prices.get("cache_write", 0) / 1e6,
+        "cost_cache_write": written * prices.get("cache_write", 0) / 1e6,
         "cost_output": row["output_tokens"] * prices["output"] / 1e6,
     }
 

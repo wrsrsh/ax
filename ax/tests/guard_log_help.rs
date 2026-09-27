@@ -146,3 +146,29 @@ fn agent_help_note_and_env() {
         assert!(env.contains(k), "{k}");
     }
 }
+
+#[test]
+fn ax_log_lines_survive_parallel_calls() {
+    let t = fixture();
+    let log = t.path().join("ax.jsonl");
+    let handles: Vec<_> = (0..24)
+        .map(|i| {
+            let dir = t.path().to_path_buf();
+            let log = log.to_string_lossy().into_owned();
+            std::thread::spawn(move || {
+                let pat = format!("r{}", i % 3);
+                ax_env(&dir, &[("AX_LOG", &log)], &["grep", &pat, "src"]);
+            })
+        })
+        .collect();
+    for h in handles {
+        h.join().unwrap();
+    }
+    let text = fs::read_to_string(&log).unwrap();
+    let lines: Vec<&str> = text.lines().collect();
+    assert_eq!(lines.len(), 24);
+    for l in lines {
+        serde_json::from_str::<serde_json::Value>(l)
+            .unwrap_or_else(|e| panic!("garbled log line {e}: {l}"));
+    }
+}

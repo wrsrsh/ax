@@ -264,12 +264,14 @@ fn log_call(started: std::time::Instant, exit: i32, out_bytes: usize, data: &ser
         "outcome": data.get("outcome").cloned().unwrap_or(serde_json::Value::Null),
         "knobs": knobs,
     });
+    // one write per line: parallel ax calls append to the same file, and
+    // O_APPEND only keeps whole writes from interleaving
     if let Ok(mut f) = std::fs::OpenOptions::new()
         .create(true)
         .append(true)
         .open(path)
     {
-        let _ = writeln!(f, "{line}");
+        let _ = f.write_all(format!("{line}\n").as_bytes());
     }
 }
 
