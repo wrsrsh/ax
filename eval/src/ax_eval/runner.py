@@ -107,8 +107,10 @@ def spent(rows: list[dict]) -> float:
     return sum(r.get("cost") or 0.0 for r in rows if not r.get("dry"))
 
 
-def est_from_ledger(rows: list[dict]) -> float | None:
-    costs = [r["cost"] for r in rows if r.get("agent") == "codex" and not r.get("dry") and not r.get("infra_failure") and r.get("cost") is not None]
+def est_from_ledger(rows: list[dict], chains: bool = False) -> float | None:
+    """mean $ per paid run; with chains=True, per long-session step instead (those rows carry `chain`)."""
+    costs = [r["cost"] for r in rows if r.get("agent") == "codex" and not r.get("dry") and not r.get("infra_failure")
+             and r.get("cost") is not None and bool(r.get("chain")) == chains]
     return sum(costs) / len(costs) if costs else None
 
 
@@ -169,6 +171,40 @@ def image_versions(name: str, image: str, with_ax: bool) -> tuple[str | None, st
     return codex_v, ax_v
 
 
+def start_container(
+    name: str, image: str, box: Path, stage: Path, setup: str, base: str,
+    api_base_url: str | None, env_key: str, catalog_src: Path, model: str, effort: str,
+) -> str:
+    """agent container at `base` with codex home + AGENTS.md in place, /out = box. returns the AGENTS.md text."""
+    home = stage_home(stage, setup, api_base_url or "http://127.0.0.1:9/v1", env_key, catalog_src, model, effort)
+    md = agents_md(setup)
+    (stage / "AGENTS.md").write_text(md)
+    docker(
+        "run", "-d", "--name", name, "--add-host", "host.docker.internal:host-gateway",
+        "-v", f"{box}:/out", "-e", "AX_LOG=/out/ax_log.jsonl", "-e", "CODEX_HOME=/codex-home",
+        "-w", "/w", "--entrypoint", "sleep", image, "infinity",
+    )
+    docker("exec", "-e", f"BASE={base}", name, "bash", "-c",
+           'set -e; cd /w; git checkout -q -f "$BASE"; git clean -fdq; echo AGENTS.md >> .git/info/exclude')
+    docker("cp", str(home), f"{name}:/codex-home")
+    docker("cp", str(stage / "AGENTS.md"), f"{name}:/w/AGENTS.md")
+    return md
+
+
+def probe(name: str, setup: str, base: str, md: str, hidden: list[str], env_key: str, log: Path) -> None:
+    """isolation probe; raises if anything leaked in."""
+    docker("cp", str(SCRIPTS / "probe.sh"), f"{name}:/tmp/probe.sh")
+    pr = docker(
+        "exec", "-e", f"PROBE_SETUP={setup}", "-e", f"PROBE_BASE={base}",
+        "-e", f"PROBE_AGENTS_SHA={hashlib.sha256(md.encode()).hexdigest()}",
+        "-e", f"PROBE_HIDDEN={chr(10).join(hidden)}", "-e", f"PROBE_ENV_KEY={env_key}",
+        name, "bash", "-c", "bash /tmp/probe.sh; s=$?; rm -f /tmp/probe.sh; exit $s", check=False,
+    )
+    log.write_text(pr.stdout + pr.stderr)
+    if pr.returncode != 0:
+        raise RuntimeError("isolation probe failed: " + "; ".join(l for l in pr.stdout.splitlines() if l.startswith("FAIL")))
+
+
 def run_one(
     task: dict,
     setup: str,
@@ -210,31 +246,11 @@ def run_one(
     try:
         image = m["image"] = agent_image(task["image"], uses_ax(setup))
         phase = "container"
-        home = stage_home(stage, setup, api_base_url or "http://127.0.0.1:9/v1", env_key, catalog_src, model, effort)
-        md = agents_md(setup)
-        (stage / "AGENTS.md").write_text(md)
-        docker(
-            "run", "-d", "--name", name, "--add-host", "host.docker.internal:host-gateway",
-            "-v", f"{box}:/out", "-e", "AX_LOG=/out/ax_log.jsonl", "-e", "CODEX_HOME=/codex-home",
-            "-w", "/w", "--entrypoint", "sleep", image, "infinity",
-        )
-        docker("exec", "-e", f"BASE={task['base']}", name, "bash", "-c",
-               'set -e; cd /w; git checkout -q -f "$BASE"; git clean -fdq; echo AGENTS.md >> .git/info/exclude')
-        docker("cp", str(home), f"{name}:/codex-home")
-        docker("cp", str(stage / "AGENTS.md"), f"{name}:/w/AGENTS.md")
+        md = start_container(name, image, box, stage, setup, task["base"], api_base_url, env_key, catalog_src, model, effort)
         m["codex_version"], m["ax_commit"] = image_versions(name, image, uses_ax(setup))
 
         phase = "probe"
-        docker("cp", str(SCRIPTS / "probe.sh"), f"{name}:/tmp/probe.sh")
-        pr = docker(
-            "exec", "-e", f"PROBE_SETUP={setup}", "-e", f"PROBE_BASE={task['base']}",
-            "-e", f"PROBE_AGENTS_SHA={hashlib.sha256(md.encode()).hexdigest()}",
-            "-e", f"PROBE_HIDDEN={chr(10).join(patch_paths(task['test_patch']))}", "-e", f"PROBE_ENV_KEY={env_key}",
-            name, "bash", "-c", "bash /tmp/probe.sh; s=$?; rm -f /tmp/probe.sh; exit $s", check=False,
-        )
-        (out_dir / "probe.log").write_text(pr.stdout + pr.stderr)
-        if pr.returncode != 0:
-            raise RuntimeError("isolation probe failed: " + "; ".join(l for l in pr.stdout.splitlines() if l.startswith("FAIL")))
+        probe(name, setup, task["base"], md, patch_paths(task["test_patch"]), env_key, out_dir / "probe.log")
 
         phase = "agent"
         cap = ["timeout", "-k", "10", str(time_cap_s)]
@@ -295,8 +311,9 @@ def describe(e: Exception) -> str:
     return f"{type(e).__name__}: {e}"[:400]
 
 
-def drive(cmd: list[str], stdin: str, name: str, out_dir: Path, time_cap_s: int, turn_cap: int | None) -> tuple[int, bool, bool, float]:
-    """run the agent, streaming its stdout to events.jsonl. (exit code, timed out, turn capped, seconds)"""
+def drive(cmd: list[str], stdin: str, name: str, out_dir: Path, time_cap_s: int, turn_cap: int | None, on_item=None) -> tuple[int, bool, bool, float]:
+    """run the agent, streaming its stdout to events.jsonl. (exit code, timed out, turn capped, seconds)
+    `on_item(item)` sees every completed item as it arrives."""
     t0 = time.time()
     capped = False
     backstop = threading.Timer(time_cap_s + 60, lambda: docker("exec", name, "bash", "-c", REAP % "KILL", check=False))
@@ -312,10 +329,14 @@ def drive(cmd: list[str], stdin: str, name: str, out_dir: Path, time_cap_s: int,
         for line in p.stdout:
             ev.write(line)
             ev.flush()
-            if turn_cap and not capped and '"item.completed"' in line:
+            if (on_item or turn_cap and not capped) and '"item.completed"' in line:
                 try:
                     it = json.loads(line).get("item", {})
                 except json.JSONDecodeError:
+                    continue
+                if on_item:
+                    on_item(it)
+                if not turn_cap or capped:
                     continue
                 tools += it.get("type") in TOOL_ITEMS
                 if tools >= turn_cap:
