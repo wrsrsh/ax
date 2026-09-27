@@ -155,6 +155,19 @@ def cost(row: dict, prices: dict) -> float:
     ) / 1e6
 
 
+COST_PARTS = ("cost_uncached", "cost_cached", "cost_cache_write", "cost_output")
+
+
+def cost_parts(row: dict, prices: dict) -> dict:
+    """cost() split by token class, same prices, sums to cost() (up to float rounding)."""
+    return {
+        "cost_uncached": row["uncached_input_tokens"] * prices["input"] / 1e6,
+        "cost_cached": row["cached_input_tokens"] * prices["cached_input"] / 1e6,
+        "cost_cache_write": (row.get("cache_write_input_tokens") or 0) * prices.get("cache_write", 0) / 1e6,
+        "cost_output": row["output_tokens"] * prices["output"] / 1e6,
+    }
+
+
 def metrics(events: Path, ax_log: Path | None = None, prices: dict | None = None) -> dict:
     row = parse_events(events.read_text().splitlines() if events.exists() else [])
     row.update(parse_ax_log(ax_log.read_text().splitlines() if ax_log and ax_log.exists() else []))
@@ -163,4 +176,5 @@ def metrics(events: Path, ax_log: Path | None = None, prices: dict | None = None
     row["ax_rejections"] = sum(row["ax_outcomes"].get(k, 0) for k in ("stale", "ambiguous", "parse-rejected", "no-match"))
     if prices:
         row["cost"] = cost(row, prices)
+        row.update(cost_parts(row, prices))
     return row

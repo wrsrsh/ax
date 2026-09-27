@@ -21,7 +21,8 @@ B = 2000  # fewer resamples keeps tests fast; the code path is the same
 def row(task, setup, rep=0, resolved=True, tokens=1000, cost=1.0, turns=10, wall=60.0, **kw):
     return {"task_id": task, "setup": setup, "rep": rep, "resolved": resolved,
             "input_tokens": tokens, "cached_input_tokens": tokens // 2, "output_tokens": tokens // 10,
-            "cost": cost, "turns": turns, "wall_seconds": wall, "infra_failure": False, **kw}
+            "cost": cost, "cost_uncached": 0.3 * cost, "cost_cached": 0.1 * cost, "cost_cache_write": 0.2 * cost,
+            "cost_output": 0.4 * cost, "turns": turns, "wall_seconds": wall, "infra_failure": False, **kw}
 
 
 def better_b(n=60, reps=3):
@@ -176,6 +177,8 @@ def test_summary_and_main(tmp_path, capsys):
     assert set(s["pass_rate"]) == {"A", "B", "C"}
     assert set(s["ratios"]["cost"]) == {"B/A", "C/A", "C/B"}
     assert s["ratios"]["cost"]["C/B"]["median"] == 1.0
+    assert s["ratios"]["cost_output"]["B/A"]["median"] == 0.5 and s["ratios"]["cost_cached"]["C/B"]["median"] == 1.0
+    assert set(s["wins_losses"]) == {"resolved", "tokens", "cost", "turns", "wall_seconds"}
     assert s["guardrail"]["verdict"].startswith("B not worse")
     p = tmp_path / "runs.jsonl"
     p.write_text("\n".join(json.dumps(r) for r in rows) + "\n")

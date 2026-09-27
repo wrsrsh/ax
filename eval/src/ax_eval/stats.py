@@ -18,10 +18,13 @@ from pathlib import Path
 
 import numpy as np
 
+from ax_eval.parse import COST_PARTS
 from ax_eval.setups import SETUPS, base_of
 from ax_eval.util import RUNS, jsonl
 
-METRICS = ("tokens", "cost", "turns", "wall_seconds")
+HEADLINE = ("tokens", "cost", "turns", "wall_seconds")
+# cost by token class (uncached input, cached input, cache writes, output) gets ratios too
+METRICS = HEADLINE + COST_PARTS
 N_BOOT = 10_000
 SEED = 0
 REJECTS = ("stale", "ambiguous", "parse-rejected", "no-match")
@@ -208,7 +211,7 @@ def summary(rows, n_boot=N_BOOT, seed=SEED) -> dict:
         "ratios": {m: {f"{b}/{a}": ratio_report(kept, m, b, a, n_boot, seed) for a, b in pairs} for m in METRICS},
         "adoption": {s: adoption(kept, s) for s in present},
         "wins_losses": {m: {f"{b} vs {a}": wins_losses(kept, m, a, b) for a, b in pairs}
-                        for m in ("resolved",) + METRICS},
+                        for m in ("resolved",) + HEADLINE},
     }
 
 
