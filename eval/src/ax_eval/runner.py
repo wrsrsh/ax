@@ -539,7 +539,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--catalog", type=Path, default=CATALOG)
     p.add_argument("--model", help=f"default {MODEL} for codex, {CLAUDE_MODEL} for claude")
     p.add_argument("--effort", default=EFFORT)
-    p.add_argument("--runs-dir", type=Path, default=RUNS)
+    p.add_argument("--runs-dir", type=lambda s: Path(s).resolve(), default=RUNS)
     p.add_argument("--ledger", type=Path, help="default <runs-dir>/ledger.jsonl. point it at eval/runs/ledger.jsonl to keep one budget across run dirs")
     a = p.parse_args(argv)
     claude = a.agent == "claude"

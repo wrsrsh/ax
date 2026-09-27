@@ -595,7 +595,7 @@ def run_batch(
                 with open(ledger, "a") as f:
                     for s in m["steps"] or [{"task": None, "cost": m.get("cost")}]:
                         row = ledger_row({**m, "task": s["task"], "resolved": s.get("resolved"), "cost": s.get("cost")}, rep, dry)
-                        f.write(json.dumps({**row, "chain": m["chain"], "step": s.get("step")}) + "\n")
+                        f.write(json.dumps({**row, "chain": m["chain"], "step": s.get("step"), "jolt": bool(m.get("jolt"))}) + "\n")
             log(f"{run_id}: " + (f"infra failure ({m['infra_reason']})" if m["infra_failure"]
                                  else "resolved " + "".join("1" if s.get("resolved") else "0" for s in m["steps"]) + f" {m.get('total_seconds')}s"))
             if not m["infra_failure"]:
@@ -666,7 +666,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--catalog", type=Path, default=CATALOG)
     p.add_argument("--model", default=MODEL)
     p.add_argument("--effort", default=EFFORT)
-    p.add_argument("--runs-dir", type=Path, default=LONG)
+    p.add_argument("--runs-dir", type=lambda s: Path(s).resolve(), default=LONG)
     p.add_argument("--ledger", type=Path, default=LEDGER)
     a = p.parse_args(argv)
 
