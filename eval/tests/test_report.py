@@ -3,7 +3,7 @@ import json
 
 import pytest
 
-from ax_eval import report
+from ax_eval import report, table
 from ax_eval.report import fallback_summary, render, verdict_metric, wilson
 from ax_eval.table import COLUMNS, collect, load, usable
 
@@ -34,6 +34,7 @@ def write_run(root, run_id, task, setup, rep, *, resolved=True, scale=1.0, grade
     inp, out = int(base * scale), int(base * scale / 10)
     (d / "metrics.json").write_text(json.dumps({
         "input_tokens": inp, "cached_input_tokens": inp // 2, "uncached_input_tokens": inp - inp // 2,
+        "cache_write_input_tokens": (inp - inp // 2) // 2,
         "output_tokens": out, "reasoning_tokens": out // 2, "tool_calls": int(10 * scale), "failed_commands": 0,
         "failed_patches": 0, "tools": {"ax read": 3, "cat": 1} if ax else {"cat": 3, "apply_patch": 1},
         "ax_calls": {"read": 3, "edit": 1} if ax else {}, "ax_outcomes": {"ok": 3, "stale": 1} if ax else {},
@@ -46,6 +47,8 @@ def write_run(root, run_id, task, setup, rep, *, resolved=True, scale=1.0, grade
 def fake(tmp_path, monkeypatch):
     # these tests pin the built-in fallback, not ax_eval.stats
     monkeypatch.setattr(report, "summary", lambda rows: (fallback_summary(rows), "built-in fallback"))
+    # metrics.json here has no cost split, so the table derives it from these
+    monkeypatch.setattr(table, "load_prices", lambda **kw: {"input": 2.0, "cached_input": 1.0, "cache_write": 0.0, "output": 10.0})
     runs = tmp_path / "runs"
     for setup, (scale, solved) in PLAN.items():
         for task in TASKS:
@@ -107,7 +110,7 @@ def test_report_renders(fake):
     md = render(rows, runs, out, tasks, subset=None)
     assert out.read_text() == md
     for h in ["# ax eval report", "## summary", "## guardrail", "## ratios vs baseline", "## adoption",
-              "## wins and losses", "## verdict", "## limitations"]:
+              "## wins and losses", "## verdict", "## limitations", "## cost breakdown"]:
         assert h in md, h
     assert "codex 0.156.0" in md and "gpt-6-astra, effort medium" in md and "abc1234" in md
     assert "5 in final.jsonl (1 dev, 4 held-out); 4 with usable runs here" in md
@@ -122,9 +125,15 @@ def test_report_renders(fake):
     assert "tokens: helped" in verdict and "cost: helped" in verdict
     assert verdict.count("no measurable difference") >= 5  # every C metric + B pass rate
     assert "stats: built-in fallback." in md
+    # A: 10k*k uncached of which 5k*k are cache writes (billed at $0 here), so 5k*k*$2 plain input,
+    # cached 5k*k*$1, output 1k*k*$10 per million -> 25/25/0/50 split, median over tasks 1-4
+    costs = md.split("## cost breakdown")[1].split("## ")[0]
+    assert "| A | $0.013 (25.0%) | $0.013 (25.0%) | $0.000 (0.0%) | $0.025 (50.0%) | $0.025 |" in costs
+    assert "cache-write tokens are 50.0% of uncached input tokens" in costs
+    assert "| B/A | cached input | 0.70x |" in costs and "| C/A | output | 1.00x |" in costs
     # the default report is the held-out split only
     held = render(rows, runs, out, tasks)
-    assert "3 with usable runs here" in held and "(heldout split)" in held
+    assert "3 with usable runs here" in held and "(heldout split, model gpt-6-astra)" in held
 
 
 def test_cli(fake, monkeypatch):
@@ -149,10 +158,11 @@ def test_summary_uses_the_real_stats_module():
     for t in ("t1", "t2", "t3"):
         for setup, tok in (("A", 100), ("B", 70)):
             rows.append({"task_id": t, "setup": setup, "rep": 0, "resolved": True, "input_tokens": tok, "cached_input_tokens": 0,
-                         "output_tokens": 0, "tokens": tok, "cost": tok / 100, "turns": 4, "wall_seconds": 8.0, "infra_failure": False})
+                         "output_tokens": 0, "tokens": tok, "cost": tok / 100, "cost_output": tok / 100, "turns": 4, "wall_seconds": 8.0, "infra_failure": False})
     s, src = report.summary(rows)
     assert src == "ax_eval.stats.summary", src
     assert s["setups"]["B"]["pass_rate"] == 1.0 and s["setups"]["B"]["ci"] == (1.0, 1.0)
     assert abs(s["ratios"]["B/A"]["tokens"]["median"] - 0.7) < 1e-9
+    assert abs(s["ratios"]["B/A"]["cost_output"]["median"] - 0.7) < 1e-9
     assert s["guardrail"]["B"]["ok"] is True
     assert s["adoption"]["A"]["runs"] == 3

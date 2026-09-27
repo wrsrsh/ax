@@ -101,6 +101,9 @@ fn parity_with_rg_across_flags() {
         &["^\\s+return"],
         &["wörld"],
         &["nothing-matches-this"],
+        &["-m", "1", "foo"],
+        &["--max-count", "2", "-i", "foo"],
+        &["-m", "1", "-C", "1", "return"],
     ];
     for args in cases {
         let ours = ax_pairs(t.path(), args);
@@ -141,6 +144,41 @@ fn files_and_counts_match_rg() {
         .collect();
     theirs.sort();
     assert_eq!(ours, theirs);
+
+    // -m caps each file's count, like rg
+    let mut ours = body(&ax(t.path(), &["grep", "-c", "-m", "1", "foo"]));
+    ours.sort();
+    let mut theirs: Vec<String> = rg(t.path(), &["-c", "-m", "1", "foo"])
+        .iter()
+        .map(|l| l.replacen(':', ": ", 1))
+        .collect();
+    theirs.sort();
+    assert_eq!(ours, theirs);
+    assert!(ours.iter().all(|l| l.ends_with(": 1")), "{ours:?}");
+}
+
+#[test]
+fn max_count_keeps_after_context_of_the_last_hit() {
+    let t = grep_fixture();
+    let o = ax(
+        t.path(),
+        &[
+            "grep",
+            "--max-count",
+            "1",
+            "-C",
+            "1",
+            "return",
+            "src/app.ts",
+        ],
+    );
+    assert!(o.status.success(), "{}", stderr(&o));
+    let out = stdout(&o);
+    assert!(out.contains("return fooBar"), "{out}");
+    assert!(!out.contains("return foo()"), "{out}");
+    // the line after the one hit still shows, as context
+    assert!(out.contains("  }"), "{out}");
+    assert!(summary(&o).starts_with("1 hit "), "{out}");
 }
 
 #[test]

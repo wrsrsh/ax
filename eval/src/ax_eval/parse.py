@@ -47,6 +47,8 @@ def segments(cmd: str) -> list[list[str]]:
     """shell words per simple command; `|`, `&&`, `;` inside quotes don't split."""
     segs, cur = [], []
     for line in cmd.split("\n"):
+        # `2>&1` and `&>` are redirections, not `&` separators
+        line = re.sub(r"&>", ">", re.sub(r"(\d*[<>])&(\d+|-)", r"\1\2", line))
         lex = shlex.shlex(line, posix=True, punctuation_chars="|&;")
         lex.whitespace_split = True
         try:
@@ -177,7 +179,9 @@ def parse_claude(events: list[dict]) -> dict:
         input_tokens=fresh + cw + cr,
         cached_input_tokens=cr,
         cache_write_input_tokens=cw,
-        uncached_input_tokens=fresh,
+        # same meaning as codex's: everything not read from cache, writes included.
+        # cost_parts takes the writes back out, so they bill once at the write rate
+        uncached_input_tokens=fresh + cw,
         output_tokens=u.get("output_tokens") or 0,
         reasoning_tokens=(u.get("output_tokens_details") or {}).get("thinking_tokens", 0) if result is not None else 0,
         tools=dict(tools),
@@ -248,13 +252,23 @@ def fallback_rate(tools: dict) -> float | None:
 
 
 def cost(row: dict, prices: dict) -> float:
-    """prices in $ per 1M tokens: input, cached_input, cache_write, output (reasoning is billed as output)."""
-    return (
-        row["uncached_input_tokens"] * prices["input"]
-        + row["cached_input_tokens"] * prices["cached_input"]
-        + row.get("cache_write_input_tokens", 0) * prices.get("cache_write", 0)
-        + row["output_tokens"] * prices["output"]
-    ) / 1e6
+    """prices in $ per 1M tokens: input, cached_input, cache_write, output (reasoning is billed as output).
+    cache-write tokens are part of input_tokens and bill at the cache-write rate instead of the input rate."""
+    return sum(cost_parts(row, prices).values())
+
+
+COST_PARTS = ("cost_uncached", "cost_cached", "cost_cache_write", "cost_output")
+
+
+def cost_parts(row: dict, prices: dict) -> dict:
+    """cost() split by token class, same prices, sums to cost() (up to float rounding)."""
+    written = row.get("cache_write_input_tokens") or 0
+    return {
+        "cost_uncached": max(row["uncached_input_tokens"] - written, 0) * prices["input"] / 1e6,
+        "cost_cached": row["cached_input_tokens"] * prices["cached_input"] / 1e6,
+        "cost_cache_write": written * prices.get("cache_write", 0) / 1e6,
+        "cost_output": row["output_tokens"] * prices["output"] / 1e6,
+    }
 
 
 def metrics(events: Path, ax_log: Path | None = None, prices: dict | None = None, agent: str | None = None) -> dict:
@@ -266,4 +280,5 @@ def metrics(events: Path, ax_log: Path | None = None, prices: dict | None = None
     row["ax_rejections"] = sum(row["ax_outcomes"].get(k, 0) for k in ("stale", "ambiguous", "parse-rejected", "no-match"))
     if prices:
         row["cost"] = cost(row, prices)
+        row.update(cost_parts(row, prices))
     return row

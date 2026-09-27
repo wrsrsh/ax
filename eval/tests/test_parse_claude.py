@@ -19,7 +19,8 @@ def test_shell_fixture():
     assert r["agent"] == "claude" and r["completed"] and r["error"] is None and r["stop"] == "completed"
     assert r["tool_calls"] == 2 and r["tools"] == {"cat": 1, "grep": 1} and r["messages"] == 1
     # 3 requests: two tool calls and the final message
-    assert r["uncached_input_tokens"] == 3 * PER_REQ["fresh"]
+    # uncached means what it means for codex: not read from cache, so writes are in it
+    assert r["uncached_input_tokens"] == 3 * (PER_REQ["fresh"] + PER_REQ["cw"])
     assert r["cache_write_input_tokens"] == 3 * PER_REQ["cw"] and r["cached_input_tokens"] == 3 * PER_REQ["cr"]
     assert r["input_tokens"] == 3 * (PER_REQ["fresh"] + PER_REQ["cw"] + PER_REQ["cr"])
     assert r["output_tokens"] == 3 * PER_REQ["out"] and r["turns"] == 3 and r["api_retries"] == 0
@@ -70,7 +71,7 @@ def test_truncated_stream_falls_back_to_assistant_usage():
     r = parse_events(trunc + ['{"type": "assist'])
     assert not r["completed"] and r["tool_calls"] == 2
     # two assistant messages seen, their start-of-stream usage counts
-    assert r["uncached_input_tokens"] == 2 * PER_REQ["fresh"] and r["cached_input_tokens"] == 2 * PER_REQ["cr"]
+    assert r["uncached_input_tokens"] == 2 * (PER_REQ["fresh"] + PER_REQ["cw"]) and r["cached_input_tokens"] == 2 * PER_REQ["cr"]
 
 
 def test_metrics_cost_matches_claude_code():
@@ -79,6 +80,19 @@ def test_metrics_cost_matches_claude_code():
     assert m["agent"] == "claude"
     assert abs(m["cost"] - m["reported_cost"]) < 1e-9
     assert abs(cost(m, prices) - 8 * (200 * 5 + 1000 * 6.25 + 3000 * 0.5 + 40 * 25) / 1e6) < 1e-12
+
+
+def test_cache_writes_bill_once_for_both_agents():
+    """written tokens bill at the write rate only, never also at the input rate."""
+    prices = {"input": 5.0, "cached_input": 0.5, "cache_write": 6.25, "output": 25.0}
+    m = metrics(FX / "shell_and_message.jsonl", None, prices, agent="claude")
+    assert m["cost_uncached"] == 3 * 200 * 5 / 1e6
+    assert abs(m["cost_cache_write"] - 3 * 1000 * 6.25 / 1e6) < 1e-12
+    assert abs(sum(m[k] for k in ("cost_uncached", "cost_cached", "cost_cache_write", "cost_output")) - m["cost"]) < 1e-12
+    assert abs(m["cost"] - m["reported_cost"]) < 1e-9
+    # a codex row with the same token classes costs the same
+    codex = {"uncached_input_tokens": 3 * 1200, "cached_input_tokens": 3 * 3000, "cache_write_input_tokens": 3 * 1000, "output_tokens": 3 * 40}
+    assert abs(cost(codex, prices) - m["cost"]) < 1e-12
 
 
 def test_codex_rows_unchanged():

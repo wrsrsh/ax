@@ -1,4 +1,4 @@
-//! `ax grep <pattern> [-F -w -i -S -t -g --in -C -l -c --all]`
+//! `ax grep <pattern> [paths…] [-F -w -i -S -t -g --in -C -l -c -m --all]`
 //!
 //! built on ripgrep's own crates with rg's defaults (line-oriented regex,
 //! binary files skipped at the first NUL, same walk), so the set of matching
@@ -29,6 +29,8 @@ pub struct GrepArgs {
     pub context: usize,
     pub files_only: bool,
     pub count: bool,
+    /// per-file cap on matching lines (rg -m)
+    pub max_count: Option<u64>,
     pub all: bool,
 }
 
@@ -87,6 +89,7 @@ pub fn run(ctx: &Ctx, a: &GrepArgs) -> Result<Report> {
     searcher
         .binary_detection(BinaryDetection::quit(b'\x00'))
         .line_number(true)
+        .max_matches(a.max_count)
         .before_context(a.context)
         .after_context(a.context);
 

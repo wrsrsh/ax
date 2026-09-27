@@ -126,6 +126,12 @@ fn agent_help_note_and_env() {
     assert!(out.starts_with("## ax\n"));
     assert!(out.contains("not type-aware"));
     assert!(out.contains("@@ replace 12:a3f1..15:9c2e"));
+    // the benchmark hands agents eval/setups/AGENTS.ax.md, so it has to be the same note
+    assert_eq!(
+        ax::help::NOTE,
+        include_str!("../../eval/setups/AGENTS.ax.md")
+    );
+    assert!(out.starts_with(ax::help::NOTE));
     let env = stdout(&ax(t.path(), &["agent-help", "--env"]));
     for k in [
         "AX_NO_CAPS",
@@ -134,8 +140,35 @@ fn agent_help_note_and_env() {
         "AX_NO_PARSE_CHECK",
         "AX_NO_RELOCATE",
         "AX_READ_WINDOW",
+        "AX_DIFF_LINES",
         "AX_LOG",
     ] {
         assert!(env.contains(k), "{k}");
+    }
+}
+
+#[test]
+fn ax_log_lines_survive_parallel_calls() {
+    let t = fixture();
+    let log = t.path().join("ax.jsonl");
+    let handles: Vec<_> = (0..24)
+        .map(|i| {
+            let dir = t.path().to_path_buf();
+            let log = log.to_string_lossy().into_owned();
+            std::thread::spawn(move || {
+                let pat = format!("r{}", i % 3);
+                ax_env(&dir, &[("AX_LOG", &log)], &["grep", &pat, "src"]);
+            })
+        })
+        .collect();
+    for h in handles {
+        h.join().unwrap();
+    }
+    let text = fs::read_to_string(&log).unwrap();
+    let lines: Vec<&str> = text.lines().collect();
+    assert_eq!(lines.len(), 24);
+    for l in lines {
+        serde_json::from_str::<serde_json::Value>(l)
+            .unwrap_or_else(|e| panic!("garbled log line {e}: {l}"));
     }
 }

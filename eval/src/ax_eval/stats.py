@@ -18,10 +18,13 @@ from pathlib import Path
 
 import numpy as np
 
+from ax_eval.parse import COST_PARTS
 from ax_eval.setups import SETUPS, base_of
 from ax_eval.util import RUNS, jsonl
 
-METRICS = ("tokens", "cost", "turns", "wall_seconds")
+HEADLINE = ("tokens", "cost", "turns", "wall_seconds")
+# cost by token class (uncached input, cached input, cache writes, output) gets ratios too
+METRICS = HEADLINE + COST_PARTS
 N_BOOT = 10_000
 SEED = 0
 REJECTS = ("stale", "ambiguous", "parse-rejected", "no-match")
@@ -208,7 +211,7 @@ def summary(rows, n_boot=N_BOOT, seed=SEED) -> dict:
         "ratios": {m: {f"{b}/{a}": ratio_report(kept, m, b, a, n_boot, seed) for a, b in pairs} for m in METRICS},
         "adoption": {s: adoption(kept, s) for s in present},
         "wins_losses": {m: {f"{b} vs {a}": wins_losses(kept, m, a, b) for a, b in pairs}
-                        for m in ("resolved",) + METRICS},
+                        for m in ("resolved",) + HEADLINE},
     }
 
 
@@ -218,11 +221,12 @@ def main(argv=None) -> int:
     p.add_argument("--seed", type=int, default=SEED)
     p.add_argument("--boot", type=int, default=N_BOOT)
     p.add_argument("--split", default="heldout", choices=("heldout", "dev", "all"))
+    p.add_argument("--model", default="gpt-6-astra", help="model to report on, or all")
     a = p.parse_args(argv)
     if not a.runs.exists():
         print(f"no runs file at {a.runs}", file=sys.stderr)
         return 1
-    rows = [r for r in jsonl(a.runs) if a.split == "all" or r.get("split") == a.split]
+    rows = [r for r in jsonl(a.runs) if (a.split == "all" or r.get("split") == a.split) and (a.model == "all" or r.get("model") == a.model)]
     print(json.dumps(summary(rows, a.boot, a.seed), indent=2))
     return 0
 
