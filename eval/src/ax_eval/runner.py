@@ -89,13 +89,24 @@ def plan(tasks: list, setups: list[str], repeats: int, seed: int) -> list[tuple[
     return items
 
 
-def load_prices(path: Path = PRICES) -> dict:
-    """$ per 1M tokens from prices.json; zeros (and a warning) without it."""
+def load_prices(path: Path = PRICES, model: str = MODEL) -> dict:
+    """$ per 1M tokens for `model` from prices.json; zeros (and a warning) if the file or the model isn't there.
+
+    reads `{"models": {name: {"per_million": ...}}}` and the old flat one-model shape.
+    """
     keys = ("input", "cached_input", "cache_write", "output")
     if not path.exists():
         print(f"warning: no {path.name}, costs will be 0", file=sys.stderr)
         return dict.fromkeys(keys, 0.0)
-    p = json.loads(path.read_text()).get("per_million", {})
+    d = json.loads(path.read_text())
+    if "models" in d:
+        entry = d["models"].get(model)
+    else:
+        entry = d if d.get("model", model) == model else None
+    if entry is None:
+        print(f"warning: no prices for {model} in {path.name}, costs will be 0", file=sys.stderr)
+        return dict.fromkeys(keys, 0.0)
+    p = entry.get("per_million", {})
     return {k: float(p.get(k, 0.0)) for k in keys}
 
 
@@ -280,7 +291,7 @@ def run_one(
             m["resolved"] = g["resolved"]
         except Exception as e:
             m["infra_failure"], m["infra_reason"] = True, f"grade: {describe(e)}"
-    mt = metrics(out_dir / "events.jsonl", out_dir / "ax_log.jsonl", prices or load_prices())
+    mt = metrics(out_dir / "events.jsonl", out_dir / "ax_log.jsonl", prices or load_prices(model=model))
     (out_dir / "metrics.json").write_text(json.dumps(mt, indent=1) + "\n")
     m["cost"] = mt.get("cost", 0.0) if agent == "codex" else 0.0
     m["ended"] = now()
@@ -468,7 +479,7 @@ def main(argv: list[str] | None = None) -> int:
 
     dry = a.agent == "stub" or a.dry_run
     kw: dict = dict(agent=a.agent, time_cap_s=a.time_cap, turn_cap=a.turn_cap, model=a.model, effort=a.effort,
-                    catalog_src=a.catalog, prices=load_prices())
+                    catalog_src=a.catalog, prices=load_prices(model=a.model))
     run_fn = run_one
     if a.agent == "codex":
         if a.dry_run:

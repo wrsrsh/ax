@@ -1,14 +1,67 @@
 {
-  "model": "gpt-6-astra",
   "provider": "azure_foundry",
   "currency": "USD",
-  "per_million": {
-    "input": 10.0,
-    "cached_input": 1.0,
-    "output": 50.0,
-    "cache_write": 12.5
-  },
-  "source": "https://azure.microsoft.com/en-us/blog/gpt-6-astra-sol-and-luna-for-production-agents-in-microsoft-foundry/",
-  "checked": "2026-09-26",
-  "notes": "global standard (pay-as-you-go), short-context rates. azure pricing page still shows placeholders for gpt-6 and points to the blog. cache writes are billed separately at $12.50/1M. long-context requests: $20 input / $2 cached / $25 cache write / $75 output; threshold not stated on any official page checked (third parties say >272k input tokens, whole request). us data zone is +10% ($11/$1.10/$55), eu data zone is +20% ($12/$1.20/$60). reasoning tokens bill as output (learn.microsoft.com reasoning doc). no per-token difference by reasoning effort; medium just changes how many tokens get spent. no per-request minimum found. context window 1,050,000 (922k in / 128k out). openai direct api matches: $10 / $1 / $50 standard."
+  "checked": "2026-09-27",
+  "models": {
+    "gpt-6-astra": {
+      "per_million": {
+        "input": 10.0,
+        "cached_input": 1.0,
+        "output": 50.0,
+        "cache_write": 12.5
+      },
+      "source": "https://azure.microsoft.com/en-us/blog/gpt-6-astra-sol-and-luna-for-production-agents-in-microsoft-foundry/",
+      "notes": "global standard (pay-as-you-go), short-context rates. azure pricing page still shows placeholders for gpt-6 and points to the blog. cache writes are billed separately at $12.50/1M. long-context requests: $20 input / $2 cached / $25 cache write / $75 output; threshold not stated on any official page checked (third parties say >272k input tokens, whole request). us data zone is +10% ($11/$1.10/$55), eu data zone is +20% ($12/$1.20/$60). reasoning tokens bill as output (learn.microsoft.com reasoning doc). no per-token difference by reasoning effort; medium just changes how many tokens get spent. no per-request minimum found. context window 1,050,000 (922k in / 128k out). openai direct api matches: $10 / $1 / $50 standard."
+    },
+    "gpt-6-sol": {
+      "per_million": {
+        "input": 2.0,
+        "cached_input": 0.2,
+        "output": 10.0,
+        "cache_write": 2.5
+      },
+      "source": "https://azure.microsoft.com/en-us/blog/gpt-6-astra-sol-and-luna-for-production-agents-in-microsoft-foundry/",
+      "notes": "version 2026-09-22. global standard, short context. same numbers in the azure retail prices api (eastus meters '6-sol ShortCo * Std Gl', effective 2026-09-01) and on openai direct (standard). azure pricing page shows '$-' with a notice pointing to the blog. long context (>272k input tokens, whole request, per openai's model page): $4 / $0.40 / $5 / $15. us data zone +10%. context window 1,050,000 (922k in / 128k out). reasoning effort: none, low, medium (default), high, xhigh, max; same per-token price at every effort, reasoning tokens bill as output."
+    },
+    "gpt-6-luna": {
+      "per_million": {
+        "input": 0.1,
+        "cached_input": 0.01,
+        "output": 0.5,
+        "cache_write": 0.125
+      },
+      "source": "https://azure.microsoft.com/en-us/blog/gpt-6-astra-sol-and-luna-for-production-agents-in-microsoft-foundry/",
+      "notes": "version 2026-09-22. global standard, short context. same numbers in the azure retail prices api (eastus meters '6-luna ShortCo * Std Gl', effective 2026-09-01) and on openai direct (standard). azure pricing page shows '$-' with a notice pointing to the blog. long context (>272k input tokens): $0.20 / $0.02 / $0.25 / $0.75. us data zone +10%. context window 1,050,000 (922k in / 128k out). reasoning effort: none, low, medium (default), high, xhigh, max; same per-token price at every effort."
+    },
+    "gpt-5.6-sol": {
+      "per_million": {
+        "input": 4.0,
+        "cached_input": 0.4,
+        "output": 20.0,
+        "cache_write": 5.0
+      },
+      "source": "https://azure.microsoft.com/en-us/blog/gpt-5-6-now-available-in-microsoft-foundry/",
+      "notes": "PROMO price. version 2026-07-09. global standard, short context. azure blog: list is $5 / $0.50 / $6.25 / $30, reduced to $4 input / $20 output from 2026-09-01 'through at least November 30, 2026' (openai direct says at least nov 21). the blog only states promo input/output; the $0.40 cached and $5 cache write come from the azure retail prices api (eastus meters '5.6 sol ShortCo * Std Gl', effective 2026-09-01) and openai's pricing page. runs after the promo ends should use the list price. long context (>272k input): $8 / $0.80 / $10 / $30 (retail api). context window 1,050,000 (922k in / 128k out). reasoning effort: none, low, medium (default), high, xhigh, max. on chat completions, function tools only work with effort none; codex uses the responses api so this shouldn't bite."
+    },
+    "gpt-5.6-terra": {
+      "per_million": {
+        "input": 2.0,
+        "cached_input": 0.2,
+        "output": 12.0,
+        "cache_write": 2.5
+      },
+      "source": "https://azure.microsoft.com/en-us/blog/gpt-5-6-now-available-in-microsoft-foundry/",
+      "notes": "version 2026-07-09. global standard, short context, after the 2026-07-30 openai price cut (azure retail meters effective 2026-08-01). matches the azure retail prices api (eastus '5.6 terra ShortCo * Std Gl') and openai direct. long context (>272k input): $4 / $0.40 / $5 / $18 (retail api). context window 1,050,000 (922k in / 128k out). reasoning effort: none, low, medium (default), high, xhigh, max. same chat-completions tools caveat as 5.6 sol."
+    },
+    "gpt-5.6-luna": {
+      "per_million": {
+        "input": 0.2,
+        "cached_input": 0.02,
+        "output": 1.2,
+        "cache_write": 0.25
+      },
+      "source": "https://azure.microsoft.com/en-us/blog/gpt-5-6-now-available-in-microsoft-foundry/",
+      "notes": "version 2026-07-09. global standard, short context, after the 2026-07-30 openai price cut (azure retail meters effective 2026-08-01). matches the azure retail prices api (eastus '5.6 luna ShortCo * Std Gl') and openai direct. note gpt-5.6-luna is 2x gpt-6-luna on input and 2.4x on output. long context (>272k input): $0.40 / $0.04 / $0.50 / $1.80 (retail api). context window 1,050,000 (922k in / 128k out). reasoning effort: none, low, medium (default), high, xhigh, max. same chat-completions tools caveat as 5.6 sol."
+    }
+  }
 }
