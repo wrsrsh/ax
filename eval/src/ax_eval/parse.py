@@ -37,6 +37,8 @@ def segments(cmd: str) -> list[list[str]]:
     """shell words per simple command; `|`, `&&`, `;` inside quotes don't split."""
     segs, cur = [], []
     for line in cmd.split("\n"):
+        # `2>&1` and `&>` are redirections, not `&` separators
+        line = re.sub(r"&>", ">", re.sub(r"(\d*[<>])&(\d+|-)", r"\1\2", line))
         lex = shlex.shlex(line, posix=True, punctuation_chars="|&;")
         lex.whitespace_split = True
         try:

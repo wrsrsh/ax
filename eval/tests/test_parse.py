@@ -18,6 +18,8 @@ def test_unwrap_and_kinds():
     assert kinds("ax --json grep foo") == ["ax grep"]
     assert kinds("rg -n 'writeSSE|retry' src && cat a.ts") == ["rg", "cat"]
     assert kinds('/bin/bash -lc "rg -n \'a|b\' src; echo done"') == ["rg", "echo"]
+    assert kinds("bun run test 2>&1 | tail -5") == ["bun", "tail"]
+    assert kinds("ax diff &> out.txt && cat out.txt") == ["ax diff", "cat"]
 
 
 def test_scripts_count_as_file_ops():
