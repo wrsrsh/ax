@@ -264,3 +264,12 @@ fn binary_after_matches_follows_rg_per_mode() {
         assert!(!theirs.iter().any(|l| l.contains("late-nul")));
     }
 }
+
+#[test]
+fn dash_n_is_accepted_and_changes_nothing() {
+    let t = fixture();
+    let a = ax(t.path(), &["grep", "-n", "export", "src"]);
+    let b = ax(t.path(), &["grep", "export", "src"]);
+    assert!(a.status.success());
+    assert_eq!(stdout(&a), stdout(&b));
+}

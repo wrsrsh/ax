@@ -287,3 +287,20 @@ fn success_echo_is_capped_with_a_read_hint() {
     assert_eq!(v["data"]["added"], 1);
     assert!(v["data"].get("lines").is_none());
 }
+
+#[test]
+fn edit_refuses_several_files_with_a_hint() {
+    let t = fixture();
+    let o = ax_in(
+        t.path(),
+        &["edit", "src/router.ts", "src/main.rs"],
+        "@@ delete 1:0000\n",
+    );
+    assert_eq!(o.status.code(), Some(1));
+    let err = String::from_utf8_lossy(&o.stderr);
+    assert!(
+        err.contains("one file (2 given)") && err.contains("once per file"),
+        "{err}"
+    );
+    assert_eq!(ax(t.path(), &["edit"]).status.code(), Some(2));
+}

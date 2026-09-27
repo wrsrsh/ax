@@ -74,6 +74,9 @@ enum Cmd {
         /// stop after this many matching lines per file, like rg -m
         #[arg(short = 'm', long)]
         max_count: Option<u64>,
+        /// accepted for rg muscle memory; hits always carry line numbers
+        #[arg(short = 'n', long = "line-number", hide = true)]
+        line_number: bool,
         /// include hidden and gitignored files
         #[arg(long)]
         all: bool,
@@ -112,7 +115,9 @@ enum Cmd {
     },
     /// apply anchored edit ops from stdin
     Edit {
-        path: String,
+        /// one file; the ops come on stdin
+        #[arg(required = true)]
+        paths: Vec<String>,
         /// show the result, write nothing
         #[arg(long)]
         dry_run: bool,
@@ -195,6 +200,7 @@ fn run(ctx: &Ctx, cmd: Cmd) -> ax::Result<Report> {
             files_with_matches,
             count,
             max_count,
+            line_number: _,
             all,
         } => ax::grep::run(
             ctx,
@@ -222,7 +228,13 @@ fn run(ctx: &Ctx, cmd: Cmd) -> ax::Result<Report> {
             within,
         } => ax::symbols::refs(ctx, &sym, code_only, &within),
         Cmd::Read { paths, sym, full } => ax::read::run(ctx, &paths, sym.as_deref(), full),
-        Cmd::Edit { path, dry_run } => ax::edit::run(ctx, &path, &stdin()?, dry_run),
+        Cmd::Edit { paths, dry_run } => match paths.as_slice() {
+            [path] => ax::edit::run(ctx, path, &stdin()?, dry_run),
+            more => Err(ax::AxError(format!(
+                "ax edit takes one file ({} given). run it once per file, each with its own ops on stdin.",
+                more.len()
+            ))),
+        },
         Cmd::Write {
             path,
             if_hash,
