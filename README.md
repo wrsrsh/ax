@@ -8,8 +8,8 @@ then we actually check whether it helps. `eval/` runs codex on real tasks from a
 
 ## commands
 
-- `ax map` – one-screen overview of a repo
-- `ax find` – files by name or rg-style glob
+- `ax map [dir]` – one-screen overview of a repo, or of one dir in it
+- `ax find <name|glob> [paths]` – files by name or rg-style glob, and if nothing matches it tells you about gitignored ones that would
 - `ax grep` – rg-compatible search, hits grouped by file and enclosing function
 - `ax outline`, `ax def`, `ax refs` – symbols, name-based
 - `ax read` – files or line ranges, with `LINE:HASH` anchors

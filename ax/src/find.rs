@@ -1,8 +1,13 @@
-//! `ax find [name|glob] [--ext rs,ts] [--in dir] [--changed 1h] [--all]`
+//! `ax find [name|glob] [paths…] [--ext rs,ts] [--in dir] [--changed 1h] [--all]`
 //!
 //! a pattern with glob chars (`* ? [ {`) is an rg-style `-g` glob (so `*.rs`
 //! matches at any depth, `src/**/*.ts` is anchored). anything else is a
-//! smart-case substring match on the file name.
+//! smart-case substring match on the file name. trailing paths are search
+//! roots, same as `--in`.
+//!
+//! when nothing matches, find looks again with hidden + gitignored files in
+//! and lists what turns up there (marked, capped), so a file the harness
+//! ignores, like AGENTS.md in .git/info/exclude, doesn't read as missing.
 
 use crate::output::{Capped, Report, Summary};
 use crate::walk::{self, WalkOpts};
@@ -45,10 +50,23 @@ pub fn parse_age(s: &str) -> Result<Duration> {
     Ok(Duration::from_secs(secs))
 }
 
-pub fn run(ctx: &Ctx, args: &FindArgs) -> Result<Report> {
+/// how many hidden/ignored files a zero-match find lists.
+const IGNORED_SHOWN: usize = 10;
+
+fn exts(args: &FindArgs) -> Vec<String> {
+    args.ext
+        .iter()
+        .flat_map(|e| e.split(','))
+        .map(|e| e.trim().trim_start_matches('.').to_string())
+        .filter(|e| !e.is_empty())
+        .collect()
+}
+
+/// every file passing the pattern/ext/age filters, repo-relative and sorted.
+fn matching(ctx: &Ctx, args: &FindArgs, all: bool) -> Result<Vec<String>> {
     let mut opts = WalkOpts {
         roots: args.within.clone(),
-        all: args.all,
+        all,
         ..Default::default()
     };
     let mut substring = None;
@@ -59,13 +77,7 @@ pub fn run(ctx: &Ctx, args: &FindArgs) -> Result<Report> {
             substring = Some(p.clone());
         }
     }
-    let exts: Vec<String> = args
-        .ext
-        .iter()
-        .flat_map(|e| e.split(','))
-        .map(|e| e.trim().trim_start_matches('.').to_string())
-        .filter(|e| !e.is_empty())
-        .collect();
+    let exts = exts(args);
     let cutoff = match &args.changed {
         Some(c) => Some(SystemTime::now() - parse_age(c)?),
         None => None,
@@ -106,7 +118,12 @@ pub fn run(ctx: &Ctx, args: &FindArgs) -> Result<Report> {
         }
         hits.push(e.rel);
     }
+    Ok(hits)
+}
 
+pub fn run(ctx: &Ctx, args: &FindArgs) -> Result<Report> {
+    let hits = matching(ctx, args, args.all)?;
+    let exts = exts(args);
     let capped = Capped::new(hits, ctx.cfg.hit_cap());
     let mut what = Vec::new();
     if let Some(p) = &args.pattern {
@@ -128,15 +145,37 @@ pub fn run(ctx: &Ctx, args: &FindArgs) -> Result<Report> {
         &what.join(" "),
         "a longer name, a glob like 'src/**/*.ts', --ext or --in <dir>",
     );
-    if capped.total == 0 && !args.all {
-        summary
-            .text
-            .push_str(" (hidden + gitignored files skipped; --all includes them)");
-    }
-
     let mut r = Report::new("find");
     r.lines = capped.items.clone();
     r.data = serde_json::json!({ "files": capped.items });
+    if capped.total == 0 && !args.all {
+        // look again with hidden + ignored files in; `.git/` itself is noise
+        let ignored: Vec<String> = matching(ctx, args, true)?
+            .into_iter()
+            .filter(|f| !f.starts_with(".git/") && !f.contains("/.git/"))
+            .collect();
+        let base = summary.text.trim_end_matches('.').to_string();
+        if ignored.is_empty() {
+            summary.text = format!("{base} (checked hidden + gitignored files too).");
+        } else {
+            let shown = ignored.len().min(IGNORED_SHOWN);
+            r.lines = ignored[..shown]
+                .iter()
+                .map(|f| format!("{f}  (ignored)"))
+                .collect();
+            let n = ignored.len();
+            let which = if shown < n {
+                format!("first {shown} above")
+            } else {
+                "above".to_string()
+            };
+            summary.text = format!(
+                "{base}, but {n} hidden/gitignored {} ({which}); ax skips those by default, --all includes them.",
+                if n == 1 { "one exists" } else { "ones exist" }
+            );
+            r.data = serde_json::json!({ "files": [], "ignored": ignored[..shown] });
+        }
+    }
     r.summary = summary;
     Ok(r)
 }

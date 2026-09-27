@@ -83,7 +83,89 @@ fn find_empty_is_success_and_says_so() {
     assert!(body(&o).is_empty());
     let s = summary(&o);
     assert!(s.starts_with("no files matching \"nope-nothing\""), "{s}");
-    assert!(s.contains("--all"), "{s}");
+    assert!(s.contains("checked hidden + gitignored files too"), "{s}");
+}
+
+#[test]
+fn find_takes_trailing_paths_like_grep() {
+    let t = fixture();
+    assert_eq!(
+        body(&ax(t.path(), &["find", "*.ts", "src/deep"])),
+        vec!["src/deep/nested/util.ts"]
+    );
+    // several roots, and a substring pattern works the same way
+    let o = ax(t.path(), &["find", ".", "src/deep", "README.md"]);
+    assert!(o.status.success(), "{}", stderr(&o));
+    assert_eq!(body(&o), vec!["README.md", "src/deep/nested/util.ts"]);
+    assert!(
+        summary(&o).contains("in src/deep, README.md"),
+        "{}",
+        summary(&o)
+    );
+    // trailing paths and --in add up
+    assert_eq!(
+        body(&ax(
+            t.path(),
+            &["find", "*.ts", "src/deep", "--in", "src/router.ts"]
+        )),
+        vec!["src/deep/nested/util.ts", "src/router.ts"]
+    );
+    let o = ax(t.path(), &["find", "x", "nope"]);
+    assert_eq!(o.status.code(), Some(1));
+}
+
+#[test]
+fn find_with_no_hits_shows_ignored_matches() {
+    let t = fixture();
+    // the harness hides AGENTS.md via .git/info/exclude, not .gitignore
+    write(t.path(), "AGENTS.md", "be nice\n");
+    write(t.path(), ".git/info/exclude", "AGENTS.md\n");
+    let o = ax(t.path(), &["find", "AGENTS.md"]);
+    assert!(o.status.success());
+    assert_eq!(body(&o), vec!["AGENTS.md  (ignored)"]);
+    let s = summary(&o);
+    assert!(s.starts_with("no files matching \"AGENTS.md\""), "{s}");
+    assert!(
+        s.contains("1 hidden/gitignored one exists") && s.contains("--all"),
+        "{s}"
+    );
+
+    // hidden dirs and gitignored files count too
+    assert_eq!(
+        body(&ax(t.path(), &["find", "secret"])),
+        vec![".hidden/secret.ts  (ignored)"]
+    );
+    assert_eq!(
+        body(&ax(t.path(), &["find", "app.log"])),
+        vec!["app.log  (ignored)"]
+    );
+    // but never git's own files
+    assert!(body(&ax(t.path(), &["find", "HEAD"])).is_empty());
+
+    // json keeps files empty and lists them apart
+    let o = ax(t.path(), &["--json", "find", "junk"]);
+    let v: serde_json::Value = serde_json::from_slice(&o.stdout).unwrap();
+    assert_eq!(v["data"]["files"], serde_json::json!([]));
+    assert_eq!(v["data"]["ignored"][0], "target/debug/junk.rs");
+
+    // capped at 10
+    for i in 0..13 {
+        write(t.path(), &format!("target/gen/g{i:02}.rs"), "x\n");
+    }
+    let o = ax(t.path(), &["find", "gen/g"]);
+    assert!(o.status.success());
+    assert_eq!(body(&o).len(), 10);
+    assert!(
+        summary(&o).contains("13 hidden/gitignored ones exist (first 10 above)"),
+        "{}",
+        summary(&o)
+    );
+
+    // --all finds them as plain hits
+    assert_eq!(
+        body(&ax(t.path(), &["find", "--all", "AGENTS.md"])),
+        vec!["AGENTS.md"]
+    );
 }
 
 #[test]
@@ -157,6 +239,58 @@ fn map_subdir_and_json() {
     assert_eq!(v["data"]["dir"], "src");
     assert_eq!(v["data"]["files"], 4);
     assert_eq!(v["data"]["branch"], "main");
+}
+
+#[test]
+fn map_a_subtree() {
+    let t = fixture();
+    write(
+        t.path(),
+        "src/deep/package.json",
+        r#"{"scripts":{"test":"vitest run"}}"#,
+    );
+    write(t.path(), "src/router.ts", "export const r = 2\n"); // dirty, outside
+    write(t.path(), "src/deep/nested/util.ts", "export const u = 3\n"); // dirty, inside
+    let o = ax(t.path(), &["map", "src/deep"]);
+    assert!(o.status.success(), "{}", stderr(&o));
+    let out = stdout(&o);
+    let lines: Vec<&str> = out.lines().collect();
+    assert!(
+        lines[0].contains("mapping src/deep/") && lines[0].contains("2 dirty"),
+        "{out}"
+    );
+    assert!(out.contains("  test: vitest run"), "{out}");
+    assert!(out.contains("  nested/  1"), "{out}");
+    assert!(
+        out.contains("src/deep/nested/util.ts") && !out.contains("src/router.ts"),
+        "{out}"
+    );
+    assert!(summary(&o).starts_with("2 files in 1 dirs"), "{out}");
+    // same thing from inside src
+    let o = ax(&t.path().join("src"), &["map", "deep"]);
+    assert!(
+        stdout(&o)
+            .lines()
+            .next()
+            .unwrap()
+            .contains("mapping src/deep/")
+    );
+}
+
+#[test]
+fn map_bad_paths_say_what_to_do() {
+    let t = fixture();
+    let o = ax(t.path(), &["map", "src/main.rs"]);
+    assert_eq!(o.status.code(), Some(1));
+    assert!(stderr(&o).contains("is a file") && stderr(&o).contains("ax outline src/main.rs"));
+    let o = ax(t.path(), &["map", "nope"]);
+    assert_eq!(o.status.code(), Some(1));
+    assert!(stderr(&o).contains("no such dir: nope"), "{}", stderr(&o));
+    // a dir with only ignored files maps to nothing, and says why
+    write(t.path(), "logs/today.log", "x\n");
+    let o = ax(t.path(), &["map", "logs"]);
+    assert!(o.status.success());
+    assert!(summary(&o).contains("--all"), "{}", summary(&o));
 }
 
 #[test]
