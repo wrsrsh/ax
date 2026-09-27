@@ -22,7 +22,7 @@ fn replace_with_anchor_from_read() {
     );
     assert!(o.status.success(), "{}", stdout(&o));
     let out = stdout(&o);
-    assert!(out.starts_with("src/math.ts: +1 -1  (1 op)"), "{out}");
+    assert!(out.starts_with("src/math.ts: +1 -1 (1 op)\n  2:"), "{out}");
     assert!(out.contains("return a + b + 0"), "{out}");
     assert!(
         summary(&o).starts_with("wrote src/math.ts (5 lines, hash "),
@@ -195,4 +195,95 @@ fn crlf_file_stays_crlf() {
         std::fs::read(t.path().join("w.py")).unwrap(),
         b"def f():\r\n    return 2\r\n    # done\r\n"
     );
+}
+
+#[test]
+fn success_echo_is_only_the_changed_lines() {
+    let t = fixture();
+    let src: String = (1..=40).map(|i| format!("line {i}\n")).collect();
+    write(t.path(), "n.txt", &src);
+    let (a3, a10, a20) = (
+        anchor(t.path(), "n.txt", 3),
+        anchor(t.path(), "n.txt", 10),
+        anchor(t.path(), "n.txt", 20),
+    );
+    // a replace whose first and last lines don't change only echoes the middle
+    let a5 = anchor(t.path(), "n.txt", 5);
+    let o = edit(
+        t.path(),
+        "n.txt",
+        &format!(
+            "@@ replace {a3}..{a5}\nline 3\nLINE FOUR\nline 5\n@@ delete {a10}\n@@ insert after {a20}\nnew a\nnew b\n"
+        ),
+    );
+    assert!(o.status.success(), "{}", stdout(&o));
+    let b = body(&o);
+    assert_eq!(b[0], "n.txt: +3 -2 (3 ops)");
+    assert_eq!(b.len(), 5, "{b:?}");
+    assert!(
+        b[1].starts_with("  4:") && b[1].ends_with("  LINE FOUR"),
+        "{b:?}"
+    );
+    assert_eq!(b[2], "  (-1 line above line 10)");
+    assert!(
+        b[3].starts_with("  20:") && b[3].ends_with("  new a"),
+        "{b:?}"
+    );
+    assert!(
+        b[4].starts_with("  21:") && b[4].ends_with("  new b"),
+        "{b:?}"
+    );
+    // no unchanged context anywhere
+    assert!(!stdout(&o).contains("line 3\n") && !stdout(&o).contains("line 19"));
+    // the echoed anchors are real
+    assert_eq!(
+        b[1].trim().split("  ").next().unwrap(),
+        anchor(t.path(), "n.txt", 4)
+    );
+}
+
+#[test]
+fn success_echo_is_capped_with_a_read_hint() {
+    let t = fixture();
+    let src: String = (1..=10).map(|i| format!("l{i}\n")).collect();
+    write(t.path(), "n.txt", &src);
+    let a = anchor(t.path(), "n.txt", 2);
+    let body_in: String = (0..30).map(|i| format!("new {i}\n")).collect();
+    let o = edit(
+        t.path(),
+        "n.txt",
+        &format!("@@ insert after {a}\n{body_in}"),
+    );
+    assert!(o.status.success(), "{}", stdout(&o));
+    let b = body(&o);
+    // header + 12 lines + the hint
+    assert_eq!(b.len(), 14, "{b:?}");
+    assert!(b[1].starts_with("  3:"), "{b:?}");
+    assert_eq!(b[13], "  … 18 more; ax read n.txt:15-32 to see");
+    // dry run has nothing to read yet
+    let a = anchor(t.path(), "n.txt", 1);
+    let o = ax_in(
+        t.path(),
+        &["edit", "--dry-run", "n.txt"],
+        format!("@@ insert after {a}\n{body_in}"),
+    );
+    assert_eq!(body(&o)[13], "  … 18 more (lines 14-31)");
+    // no caps, no cut
+    let a = anchor(t.path(), "n.txt", 1);
+    let o = ax_env_in(
+        t.path(),
+        &[("AX_NO_CAPS", "1")],
+        &["edit", "--dry-run", "n.txt"],
+        format!("@@ insert after {a}\n{body_in}"),
+    );
+    assert_eq!(body(&o).len(), 31);
+    // --json is unchanged: counts and hash, no lines
+    let o = ax_in(
+        t.path(),
+        &["--json", "edit", "--dry-run", "n.txt"],
+        format!("@@ insert after {a}\nx\n"),
+    );
+    let v: serde_json::Value = serde_json::from_slice(&o.stdout).unwrap();
+    assert_eq!(v["data"]["added"], 1);
+    assert!(v["data"].get("lines").is_none());
 }

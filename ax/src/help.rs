@@ -38,6 +38,7 @@ AX_NO_RELOCATE=1     moved anchors are refused instead of found again
 AX_MAX_HITS=n        hit cap for grep/find/refs/def (50)
 AX_READ_WINDOW=n     lines per read window (200)
 AX_LONG_FILE=n       files longer than this get outline + window (300)
+AX_DIFF_LINES=n      hunk lines `ax diff` shows before cutting (40)
 AX_MAX_BYTES=n       text output cap per call, cut at line boundaries (24000)
 AX_LOG=<file>        append one json line per call
 ";

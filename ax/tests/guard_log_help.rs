@@ -140,6 +140,7 @@ fn agent_help_note_and_env() {
         "AX_NO_PARSE_CHECK",
         "AX_NO_RELOCATE",
         "AX_READ_WINDOW",
+        "AX_DIFF_LINES",
         "AX_LOG",
     ] {
         assert!(env.contains(k), "{k}");

@@ -164,10 +164,15 @@ fn diff_clean_dirty_untracked_and_caps() {
         summary(&o)
     );
 
-    let o = ax_env(t.path(), &[("AX_READ_WINDOW", "3")], &["diff"]);
-    assert!(summary(&o).contains("showed 3 of"), "{}", summary(&o));
-    let o = ax_env(t.path(), &[("AX_READ_WINDOW", "3")], &["diff", "--full"]);
+    let o = ax_env(t.path(), &[("AX_DIFF_LINES", "3")], &["diff"]);
+    let s = summary(&o);
+    assert!(s.contains("showed 3 of"), "{s}");
+    assert!(s.contains("--stat") && s.contains("--full"), "{s}");
+    let o = ax_env(t.path(), &[("AX_DIFF_LINES", "3")], &["diff", "--full"]);
     assert!(!summary(&o).contains("showed"));
+    // the read window doesn't cap diffs any more
+    let o = ax_env(t.path(), &[("AX_READ_WINDOW", "3")], &["diff"]);
+    assert!(!summary(&o).contains("showed"), "{}", summary(&o));
 
     let o = ax(t.path(), &["diff", "--stat"]);
     let out = stdout(&o);
@@ -198,4 +203,30 @@ fn diff_clean_dirty_untracked_and_caps() {
 fn diff_outside_git_is_an_error() {
     let t = tempfile::tempdir().unwrap();
     assert_eq!(ax(t.path(), &["diff"]).status.code(), Some(1));
+}
+
+#[test]
+fn diff_hunks_default_to_40_lines() {
+    let t = fixture();
+    let big: String = (0..100)
+        .map(|i| format!("export const v{i} = {i}\n"))
+        .collect();
+    write(t.path(), "src/router.ts", &big);
+    let o = ax(t.path(), &["diff"]);
+    assert!(o.status.success());
+    let s = summary(&o);
+    assert!(s.contains("showed 40 of"), "{s}");
+    let out = stdout(&o);
+    let hunk_lines = out
+        .lines()
+        .skip_while(|l| !l.starts_with("diff --git"))
+        .count()
+        - 1; // the summary
+    assert_eq!(hunk_lines, 40, "{out}");
+    let full = ax(t.path(), &["diff", "--full"]);
+    assert!(!summary(&full).contains("showed"));
+    assert!(stdout(&full).contains("+export const v99 = 99"));
+    let v: serde_json::Value =
+        serde_json::from_slice(&ax(t.path(), &["--json", "diff"]).stdout).unwrap();
+    assert_eq!(v["data"]["patch"].as_str().unwrap().lines().count(), 40);
 }

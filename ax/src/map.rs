@@ -1,10 +1,11 @@
 //! `ax map [dir]`: one screen (~50 lines) to get your bearings. branch +
 //! dirty files, stack, build/test scripts, agent docs, and a gitignore-aware
 //! tree with file counts that expands the biggest dirs while space lasts.
+//! with a dir, all of that is rooted there (dirty files too).
 
 use crate::output::{Report, Summary};
 use crate::walk::{self, WalkOpts};
-use crate::{Ctx, Result, repo};
+use crate::{AxError, Ctx, Result, repo};
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -256,6 +257,18 @@ pub fn run(ctx: &Ctx, dir: Option<&str>) -> Result<Report> {
         Some(d) => repo::absolute(&ctx.cwd, d.as_ref()),
         None => ctx.root.clone(),
     };
+    if let Some(d) = dir {
+        if !base.exists() {
+            return Err(AxError(format!(
+                "no such dir: {d} (`ax find {d}` looks it up by name)"
+            )));
+        }
+        if !base.is_dir() {
+            return Err(AxError(format!(
+                "{d} is a file; `ax outline {d}` or `ax read {d}` it, or `ax map` its dir"
+            )));
+        }
+    }
     let base_rel = repo::rel(&ctx.root, &base);
     let opts = WalkOpts {
         roots: vec![base.to_string_lossy().into_owned()],
@@ -289,7 +302,9 @@ pub fn run(ctx: &Ctx, dir: Option<&str>) -> Result<Report> {
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_default();
     let branch = git(&ctx.root, &["rev-parse", "--abbrev-ref", "HEAD"]);
-    let dirty: Vec<String> = git(&ctx.root, &["status", "--porcelain"])
+    // dirty files under the mapped dir only
+    let base_arg = base.to_string_lossy();
+    let dirty: Vec<String> = git(&ctx.root, &["status", "--porcelain", "--", &base_arg])
         .map(|s| s.lines().map(str::to_string).collect())
         .unwrap_or_default();
     let head = match &branch {
@@ -370,6 +385,11 @@ pub fn run(ctx: &Ctx, dir: Option<&str>) -> Result<Report> {
         "{} files in {n_dirs} dirs. zoom in with `ax map <dir>`, list with `ax find`, peek with `ax outline <dir>`.",
         files.len()
     ));
+    if files.is_empty() {
+        r.summary = Summary::plain(format!(
+            "no files here (hidden + gitignored skipped; `ax find --all --in {base_rel}` lists them)."
+        ));
+    }
     r.summary.total = files.len();
     r.summary.shown = files.len();
     r.data = json!({

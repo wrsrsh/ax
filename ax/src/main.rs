@@ -16,11 +16,13 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Cmd {
-    /// one-screen overview of a repo
+    /// one-screen overview of a repo, or of one dir in it
     Map { dir: Option<String> },
     /// find files by name (smart-case substring) or rg-style glob
     Find {
         pattern: Option<String>,
+        /// dirs to search under (same as --in)
+        paths: Vec<String>,
         /// only these extensions (comma-separated or repeated)
         #[arg(long)]
         ext: Vec<String>,
@@ -69,6 +71,9 @@ enum Cmd {
         /// count hits per file
         #[arg(short = 'c', long)]
         count: bool,
+        /// stop after this many matching lines per file, like rg -m
+        #[arg(short = 'm', long)]
+        max_count: Option<u64>,
         /// include hidden and gitignored files
         #[arg(long)]
         all: bool,
@@ -161,6 +166,7 @@ fn run(ctx: &Ctx, cmd: Cmd) -> ax::Result<Report> {
         Cmd::Map { dir } => ax::map::run(ctx, dir.as_deref()),
         Cmd::Find {
             pattern,
+            paths,
             ext,
             within,
             changed,
@@ -170,7 +176,7 @@ fn run(ctx: &Ctx, cmd: Cmd) -> ax::Result<Report> {
             &ax::find::FindArgs {
                 pattern,
                 ext,
-                within,
+                within: within.into_iter().chain(paths).collect(),
                 changed,
                 all,
             },
@@ -188,6 +194,7 @@ fn run(ctx: &Ctx, cmd: Cmd) -> ax::Result<Report> {
             context,
             files_with_matches,
             count,
+            max_count,
             all,
         } => ax::grep::run(
             ctx,
@@ -203,6 +210,7 @@ fn run(ctx: &Ctx, cmd: Cmd) -> ax::Result<Report> {
                 context,
                 files_only: files_with_matches,
                 count,
+                max_count,
                 all,
             },
         ),
