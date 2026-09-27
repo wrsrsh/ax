@@ -2,6 +2,7 @@
 
     uv run python -m ax_eval.runner --tasks dev --setups A B C --repeats 1 --agent stub --dry-run
     uv run python -m ax_eval.runner --tasks dev --setups B --agent codex --dry-run   # codex vs the fake api
+    uv run python -m ax_eval.runner --tasks dev --setups A B C --agent claude --dry-run   # claude code vs a fake messages api
     uv run python -m ax_eval.runner --tasks all --repeats 3 --seed 7 --plan-only
 
 each run gets runs/<run-id>/ with manifest.json, events.jsonl, stderr.log,
@@ -12,6 +13,8 @@ dir is kept with `retried_as` set.
 
 codex against a real api needs --paid plus --api-base-url and --env-key. the
 key is only ever handed to `docker exec -e NAME`, read from this process's env.
+claude code needs --paid and a key in ANTHROPIC_API_KEY (or --env-key naming
+another var); --api-base-url is optional there and defaults to anthropic's.
 """
 
 from __future__ import annotations
@@ -33,11 +36,11 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from ax_eval.fakeapi import Script, serve
+from ax_eval import fakeapi, fakeapi_anthropic
 from ax_eval.grade import grade, patch_paths
 from ax_eval.images import agent_image
 from ax_eval.parse import metrics, parse_events
-from ax_eval.setups import CORE, SETUPS, agents_md, codex_args, uses_ax, write_codex_home
+from ax_eval.setups import CORE, SETUPS, agents_md, claude_args, codex_args, note_name, uses_ax, write_codex_home
 from ax_eval.util import EVAL, RUNS, TASKS, jsonl, sh
 
 LEDGER = RUNS / "ledger.jsonl"
@@ -47,6 +50,16 @@ CATALOG = Path.home() / ".codex/model-catalogs/azure-foundry.json"
 MODEL, EFFORT = "gpt-6-astra", "medium"
 BUDGET = 2000.0
 FAKE_KEY = "AX_EVAL_FAKE_KEY"
+AGENTS = ("stub", "codex", "claude")
+PAID = ("codex", "claude")
+CLAUDE_MODEL = "claude-opus-5"
+CLAUDE_TURNS = 100  # --max-turns when no --turn-cap is given
+CLAUDE_BASE_URL = "https://api.anthropic.com"
+CLAUDE_HOME = "/claude-home"
+# set on the container, not secrets. no autoupdate, no telemetry/feedback calls.
+# IS_SANDBOX: claude code refuses bypassPermissions as root without it, and the
+# task images run as root like they do for codex.
+CLAUDE_ENV = {"CLAUDE_CONFIG_DIR": CLAUDE_HOME, "DISABLE_AUTOUPDATER": "1", "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1", "IS_SANDBOX": "1"}
 # codex 0.156.0 has no turn or step limit (no flag, no config key); turn_cap is
 # enforced here by counting tool calls in the event stream.
 TOOL_ITEMS = ("command_execution", "file_change", "mcp_tool_call")
@@ -89,13 +102,19 @@ def plan(tasks: list, setups: list[str], repeats: int, seed: int) -> list[tuple[
     return items
 
 
-def load_prices(path: Path = PRICES) -> dict:
-    """$ per 1M tokens from prices.json; zeros (and a warning) without it."""
+def load_prices(path: Path = PRICES, model: str | None = None) -> dict:
+    """$ per 1M tokens from prices.json; zeros (and a warning) without it. with a
+    model, its entry under `models` (zeros and a warning if there isn't one)."""
     keys = ("input", "cached_input", "cache_write", "output")
     if not path.exists():
         print(f"warning: no {path.name}, costs will be 0", file=sys.stderr)
         return dict.fromkeys(keys, 0.0)
-    p = json.loads(path.read_text()).get("per_million", {})
+    d = json.loads(path.read_text())
+    p = d.get("per_million", {})
+    if model is not None and model != d.get("model"):
+        if model not in d.get("models", {}):
+            print(f"warning: no prices for {model} in {path.name}, costs will be 0", file=sys.stderr)
+        p = d.get("models", {}).get(model, {}).get("per_million", {})
     return {k: float(p.get(k, 0.0)) for k in keys}
 
 
@@ -107,8 +126,8 @@ def spent(rows: list[dict]) -> float:
     return sum(r.get("cost") or 0.0 for r in rows if not r.get("dry"))
 
 
-def est_from_ledger(rows: list[dict]) -> float | None:
-    costs = [r["cost"] for r in rows if r.get("agent") == "codex" and not r.get("dry") and not r.get("infra_failure") and r.get("cost") is not None]
+def est_from_ledger(rows: list[dict], agent: str = "codex") -> float | None:
+    costs = [r["cost"] for r in rows if r.get("agent") == agent and not r.get("dry") and not r.get("infra_failure") and r.get("cost") is not None]
     return sum(costs) / len(costs) if costs else None
 
 
@@ -159,8 +178,8 @@ def stage_home(stage: Path, setup: str, base_url: str, env_key: str, catalog_src
     return home
 
 
-def image_versions(name: str, image: str, with_ax: bool) -> tuple[str | None, str | None]:
-    r = docker("exec", name, "codex", "--version", check=False)
+def image_versions(name: str, image: str, with_ax: bool, cli: str = "codex") -> tuple[str | None, str | None]:
+    r = docker("exec", name, cli, "--version", check=False)
     codex_v = r.stdout.strip() or None
     label = docker("image", "inspect", "-f", '{{index .Config.Labels "org.ax.commit"}}', image, check=False).stdout.strip()
     ax_v = label if label and label != "<no value>" else None
@@ -185,10 +204,14 @@ def run_one(
     model: str = MODEL,
     effort: str = EFFORT,
     prices: dict | None = None,
+    max_run_usd: float | None = None,
 ) -> dict:
-    assert agent in ("codex", "stub") and setup in SETUPS
+    assert agent in AGENTS and setup in SETUPS
+    claude = agent == "claude"
     if agent == "codex" and not api_base_url:
         raise ValueError("codex runs need api_base_url")
+    if claude and turn_cap is None:
+        turn_cap = CLAUDE_TURNS
     out_dir.mkdir(parents=True, exist_ok=False)
     box = out_dir / "box"
     box.mkdir()
@@ -196,39 +219,49 @@ def run_one(
         (out_dir / f).touch()
     m = {
         "run_id": run_id, "task": task["id"], "setup": setup, "seed": seed, "agent": agent,
-        "model": model if agent == "codex" else None, "effort": effort if agent == "codex" else None,
+        "model": model if agent in PAID else None, "effort": effort if agent in PAID else None,
         "codex_version": None, "ax_commit": None, "image": None, "api_base_url": api_base_url,
         "time_cap_s": time_cap_s, "turn_cap": turn_cap,
         "started": now(), "ended": None, "agent_seconds": None, "total_seconds": None,
         "exit_code": None, "timed_out": False, "turn_capped": False,
         "infra_failure": False, "infra_reason": None, "resolved": None, "cost": None,
     }
+    if claude:
+        m = {**m, "claude_version": None, "api_base_url": api_base_url or CLAUDE_BASE_URL, "max_run_usd": max_run_usd}
+    note = note_name(agent)
     t0 = time.time()
     name = f"ax-run-{run_id}"
     phase = "image"
     stage = Path(tempfile.mkdtemp(prefix="ax-run-"))
     try:
-        image = m["image"] = agent_image(task["image"], uses_ax(setup))
+        image = m["image"] = agent_image(task["image"], uses_ax(setup), agent="claude" if claude else "codex")
         phase = "container"
-        home = stage_home(stage, setup, api_base_url or "http://127.0.0.1:9/v1", env_key, catalog_src, model, effort)
         md = agents_md(setup)
-        (stage / "AGENTS.md").write_text(md)
+        (stage / note).write_text(md)
+        env = [f"{k}={v}" for k, v in CLAUDE_ENV.items()] if claude else ["CODEX_HOME=/codex-home"]
         docker(
             "run", "-d", "--name", name, "--add-host", "host.docker.internal:host-gateway",
-            "-v", f"{box}:/out", "-e", "AX_LOG=/out/ax_log.jsonl", "-e", "CODEX_HOME=/codex-home",
+            "-v", f"{box}:/out", "-e", "AX_LOG=/out/ax_log.jsonl", *(a for e in env for a in ("-e", e)),
             "-w", "/w", "--entrypoint", "sleep", image, "infinity",
         )
-        docker("exec", "-e", f"BASE={task['base']}", name, "bash", "-c",
-               'set -e; cd /w; git checkout -q -f "$BASE"; git clean -fdq; echo AGENTS.md >> .git/info/exclude')
-        docker("cp", str(home), f"{name}:/codex-home")
-        docker("cp", str(stage / "AGENTS.md"), f"{name}:/w/AGENTS.md")
-        m["codex_version"], m["ax_commit"] = image_versions(name, image, uses_ax(setup))
+        docker("exec", "-e", f"BASE={task['base']}", "-e", f"NOTE={note}", name, "bash", "-c",
+               'set -e; cd /w; git checkout -q -f "$BASE"; git clean -fdq; echo "$NOTE" >> .git/info/exclude')
+        if claude:
+            docker("exec", name, "mkdir", "-m", "700", CLAUDE_HOME)
+        else:
+            home = stage_home(stage, setup, api_base_url or "http://127.0.0.1:9/v1", env_key, catalog_src, model, effort)
+            docker("cp", str(home), f"{name}:/codex-home")
+        docker("cp", str(stage / note), f"{name}:/w/{note}")
+        if claude:
+            m["claude_version"], m["ax_commit"] = image_versions(name, image, uses_ax(setup), "claude")
+        else:
+            m["codex_version"], m["ax_commit"] = image_versions(name, image, uses_ax(setup))
 
         phase = "probe"
         docker("cp", str(SCRIPTS / "probe.sh"), f"{name}:/tmp/probe.sh")
         pr = docker(
-            "exec", "-e", f"PROBE_SETUP={setup}", "-e", f"PROBE_BASE={task['base']}",
-            "-e", f"PROBE_AGENTS_SHA={hashlib.sha256(md.encode()).hexdigest()}",
+            "exec", "-e", f"PROBE_SETUP={setup}", "-e", f"PROBE_BASE={task['base']}", "-e", f"PROBE_AGENT={agent}",
+            "-e", f"PROBE_NOTE={note}", "-e", f"PROBE_AGENTS_SHA={hashlib.sha256(md.encode()).hexdigest()}",
             "-e", f"PROBE_HIDDEN={chr(10).join(patch_paths(task['test_patch']))}", "-e", f"PROBE_ENV_KEY={env_key}",
             name, "bash", "-c", "bash /tmp/probe.sh; s=$?; rm -f /tmp/probe.sh; exit $s", check=False,
         )
@@ -238,10 +271,21 @@ def run_one(
 
         phase = "agent"
         cap = ["timeout", "-k", "10", str(time_cap_s)]
+        penv = None
         if agent == "stub":
             docker("cp", str(SCRIPTS / "stub_agent.sh"), f"{name}:/tmp/stub.sh")
             cmd = ["docker", "exec", "-e", f"STUB_SETUP={setup}", "-e", f"STUB_FILE={task['src_files'][0]}", name, *cap, "bash", "/tmp/stub.sh"]
             stdin = ""
+        elif claude:
+            if env_key not in os.environ:
+                raise RuntimeError(f"${env_key} is not set")
+            # claude code only reads its own var names; the value goes through this
+            # process's env to `docker exec -e NAME`, never onto a command line
+            var = claude_key_var(env_key)
+            penv = {**os.environ, var: os.environ[env_key]}
+            cmd = ["docker", "exec", "-i", "-e", var, "-e", f"ANTHROPIC_BASE_URL={m['api_base_url']}", name, *cap,
+                   "claude", *claude_args(setup, model, effort, turn_cap, max_run_usd)]
+            stdin = task["instruction"]
         else:
             if env_key not in os.environ:
                 raise RuntimeError(f"${env_key} is not set")
@@ -250,11 +294,14 @@ def run_one(
             cmd = ["docker", "exec", "-i", "-e", env_key, name, *cap, "codex", "exec", *args,
                    "-m", model, "-c", f'model_reasoning_effort="{effort}"', "-C", "/w", "-"]
             stdin = task["instruction"]
-        m["exit_code"], m["timed_out"], m["turn_capped"], m["agent_seconds"] = drive(cmd, stdin, name, out_dir, time_cap_s, turn_cap)
+        m["exit_code"], m["timed_out"], m["turn_capped"], m["agent_seconds"] = drive(
+            cmd, stdin, name, out_dir, time_cap_s, None if claude else turn_cap, penv)
+        if claude:
+            m["turn_capped"] = parse_events((out_dir / "events.jsonl").read_text().splitlines()).get("stop") == "max_turns"
 
         phase = "collect"
-        d = docker("exec", "-e", f"BASE={task['base']}", name, "bash", "-c",
-                   'cd /w && git add -A && git diff --cached --binary "$BASE" -- . ":(exclude)AGENTS.md"')
+        d = docker("exec", "-e", f"BASE={task['base']}", "-e", f"NOTE={note}", name, "bash", "-c",
+                   'cd /w && git add -A && git diff --cached --binary "$BASE" -- . ":(exclude)$NOTE"')
         (out_dir / "final.diff").write_text(d.stdout)
         events = (out_dir / "events.jsonl").read_text().splitlines()
         why = infra_reason(m["exit_code"], m["timed_out"], events, (out_dir / "stderr.log").read_text())
@@ -280,9 +327,9 @@ def run_one(
             m["resolved"] = g["resolved"]
         except Exception as e:
             m["infra_failure"], m["infra_reason"] = True, f"grade: {describe(e)}"
-    mt = metrics(out_dir / "events.jsonl", out_dir / "ax_log.jsonl", prices or load_prices())
+    mt = metrics(out_dir / "events.jsonl", out_dir / "ax_log.jsonl", prices or load_prices(model=model if claude else None), agent=agent)
     (out_dir / "metrics.json").write_text(json.dumps(mt, indent=1) + "\n")
-    m["cost"] = mt.get("cost", 0.0) if agent == "codex" else 0.0
+    m["cost"] = mt.get("cost", 0.0) if agent in PAID else 0.0
     m["ended"] = now()
     m["total_seconds"] = round(time.time() - t0, 1)
     write_manifest(out_dir, m)
@@ -295,13 +342,19 @@ def describe(e: Exception) -> str:
     return f"{type(e).__name__}: {e}"[:400]
 
 
-def drive(cmd: list[str], stdin: str, name: str, out_dir: Path, time_cap_s: int, turn_cap: int | None) -> tuple[int, bool, bool, float]:
+def claude_key_var(env_key: str) -> str:
+    """the var claude code reads the key from: a gateway bearer token stays one."""
+    return "ANTHROPIC_AUTH_TOKEN" if env_key == "ANTHROPIC_AUTH_TOKEN" else "ANTHROPIC_API_KEY"
+
+
+def drive(cmd: list[str], stdin: str, name: str, out_dir: Path, time_cap_s: int, turn_cap: int | None,
+          env: dict | None = None) -> tuple[int, bool, bool, float]:
     """run the agent, streaming its stdout to events.jsonl. (exit code, timed out, turn capped, seconds)"""
     t0 = time.time()
     capped = False
     backstop = threading.Timer(time_cap_s + 60, lambda: docker("exec", name, "bash", "-c", REAP % "KILL", check=False))
     with open(out_dir / "events.jsonl", "w") as ev, open(out_dir / "stderr.log", "w") as err:
-        p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=err, text=True)
+        p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=err, text=True, env=env)
         backstop.start()
         try:
             p.stdin.write(stdin)
@@ -357,7 +410,7 @@ def run_batch(
     last manifest per item, or {"refused": reason} once the budget is hit."""
     by_id = {t["id"]: t for t in tasks}
     if est is None:
-        est = 0.0 if dry else est_from_ledger(read_ledger(ledger))
+        est = 0.0 if dry else est_from_ledger(read_ledger(ledger), kw.get("agent") or "codex")
         if est is None:
             raise BudgetExceeded("no paid runs in the ledger yet; pass --est")
     gate = Budget(budget, 0.0 if dry else est, ledger)
@@ -421,14 +474,16 @@ def fake_steps(task: dict, setup: str) -> list[str]:
 
 
 def with_fake_api(run_fn=run_one):
-    """a run_fn that points codex at a fresh fake api per run (bound to the
-    docker bridge, reached as host.docker.internal via host-gateway)."""
+    """a run_fn that points the agent at a fresh fake api per run (bound to the
+    docker bridge, reached as host.docker.internal via host-gateway): the
+    responses api for codex, the messages api for claude code."""
 
     def fn(task: dict, setup: str, run_id: str, out_dir: Path, **kw) -> dict:
-        srv, port = serve(Script(fake_steps(task, setup)), host=bridge_ip())
+        api, path = (fakeapi_anthropic, "") if kw.get("agent") == "claude" else (fakeapi, "/v1")
+        srv, port = api.serve(api.Script(fake_steps(task, setup)), host=bridge_ip())
         os.environ.setdefault(FAKE_KEY, "dummy")
         try:
-            return run_fn(task, setup, run_id, out_dir, **{**kw, "api_base_url": f"http://host.docker.internal:{port}/v1", "env_key": FAKE_KEY})
+            return run_fn(task, setup, run_id, out_dir, **{**kw, "api_base_url": f"http://host.docker.internal:{port}{path}", "env_key": FAKE_KEY})
         finally:
             srv.shutdown()
 
@@ -441,22 +496,31 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--setups", nargs="+", default=list(CORE), choices=SETUPS, help="A B C, plus Ar Br Cr with code mode off")
     p.add_argument("--repeats", type=int, default=1)
     p.add_argument("--seed", type=int, default=0)
-    p.add_argument("--agent", choices=("stub", "codex"), default="stub")
-    p.add_argument("--dry-run", action="store_true", help="$0 only: stub, or codex against a local fake api")
-    p.add_argument("--paid", action="store_true", help="codex against a real api. only with the gate approved")
+    p.add_argument("--agent", choices=AGENTS, default="stub")
+    p.add_argument("--dry-run", action="store_true", help="$0 only: stub, or codex / claude against a local fake api")
+    p.add_argument("--paid", action="store_true", help="codex or claude against a real api. only with the gate approved")
     p.add_argument("--plan-only", action="store_true", help="print the run order and exit")
     p.add_argument("--parallel", type=int, default=1)
     p.add_argument("--budget", type=float, default=BUDGET)
     p.add_argument("--est", type=float, help="$ per run for the budget check (default: ledger mean)")
     p.add_argument("--time-cap", type=int, default=1200)
-    p.add_argument("--turn-cap", type=int, help="stop the agent after this many tool calls")
+    p.add_argument("--turn-cap", type=int, help=f"codex: stop after this many tool calls. claude: --max-turns (default {CLAUDE_TURNS})")
+    p.add_argument("--max-run-usd", type=float, help="claude only: --max-budget-usd per run")
     p.add_argument("--api-base-url")
-    p.add_argument("--env-key", help="name of the env var holding the api key")
+    p.add_argument("--env-key", help="name of the env var holding the api key (claude: default ANTHROPIC_API_KEY)")
     p.add_argument("--catalog", type=Path, default=CATALOG)
-    p.add_argument("--model", default=MODEL)
+    p.add_argument("--model", help=f"default {MODEL} for codex, {CLAUDE_MODEL} for claude")
     p.add_argument("--effort", default=EFFORT)
     p.add_argument("--runs-dir", type=Path, default=RUNS)
+    p.add_argument("--ledger", type=Path, help="default <runs-dir>/ledger.jsonl. point it at eval/runs/ledger.jsonl to keep one budget across run dirs")
     a = p.parse_args(argv)
+    claude = a.agent == "claude"
+    a.model = a.model or (CLAUDE_MODEL if claude else MODEL)
+    if claude:
+        a.env_key = a.env_key or "ANTHROPIC_API_KEY"
+        bad = [s for s in a.setups if s not in CORE]
+        if bad:
+            p.error(f"claude runs setups {' '.join(CORE)} only, not {' '.join(bad)}")
 
     tasks = load_tasks(a.tasks)
     items = plan(tasks, a.setups, a.repeats, a.seed)
@@ -468,7 +532,9 @@ def main(argv: list[str] | None = None) -> int:
 
     dry = a.agent == "stub" or a.dry_run
     kw: dict = dict(agent=a.agent, time_cap_s=a.time_cap, turn_cap=a.turn_cap, model=a.model, effort=a.effort,
-                    catalog_src=a.catalog, prices=load_prices())
+                    catalog_src=a.catalog, prices=load_prices(model=a.model if claude else None))
+    if claude:
+        kw["max_run_usd"] = a.max_run_usd
     run_fn = run_one
     if a.agent == "codex":
         if a.dry_run:
@@ -479,7 +545,16 @@ def main(argv: list[str] | None = None) -> int:
             p.error("--paid needs --api-base-url and --env-key naming a set env var")
         else:
             kw.update(api_base_url=a.api_base_url, env_key=a.env_key)
-    ledger = a.runs_dir / "ledger.jsonl"
+    elif claude:
+        if a.dry_run:
+            run_fn = with_fake_api()
+        elif not a.paid:
+            p.error("claude without --dry-run spends money: pass --paid, and only once the gate is approved")
+        elif a.env_key not in os.environ:
+            p.error(f"--paid needs ${a.env_key} set (or --env-key naming a set env var)")
+        else:
+            kw.update(api_base_url=a.api_base_url, env_key=a.env_key)
+    ledger = a.ledger or a.runs_dir / "ledger.jsonl"
     try:
         res = run_batch(items, tasks, runs_dir=a.runs_dir, ledger=ledger, budget=a.budget, est=a.est,
                         parallel=a.parallel, dry=dry, seed=a.seed, run_fn=run_fn, **kw)

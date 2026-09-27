@@ -20,7 +20,7 @@ from statistics import mean
 from ax_eval.util import RUNS, TASKS, jsonl
 
 MANIFEST = [
-    "run_id", "task_id", "setup", "rep", "seed", "agent", "codex_version", "model", "effort",
+    "run_id", "task_id", "setup", "rep", "seed", "agent", "codex_version", "claude_version", "model", "effort",
     "ax_commit", "image", "started", "ended", "exit_code", "timed_out", "infra_failure", "infra_reason",
 ]
 GRADE = ["resolved", "f2p_passed", "f2p_total", "p2p_passed", "p2p_total", "grade_seconds"]
@@ -71,8 +71,8 @@ def row(run: Path, split: dict[str, str] | None = None) -> dict:
     r["run_id"] = r["run_id"] or run.name
     # the runner writes the task under "task"
     r["task_id"] = m.get("task_id") or m.get("task")
-    # stub runs and codex against the fake api cost nothing and prove nothing
-    r["dry"] = m.get("agent") != "codex" or any(h in (m.get("api_base_url") or "") for h in ("host.docker.internal", "127.0.0.1", "localhost"))
+    # stub runs and codex / claude against a fake api cost nothing and prove nothing
+    r["dry"] = m.get("agent") not in ("codex", "claude") or any(h in (m.get("api_base_url") or "") for h in ("host.docker.internal", "127.0.0.1", "localhost"))
     r["timed_out"] = bool(r["timed_out"])
     r["infra_failure"] = bool(r["infra_failure"])
     r["split"] = (split or {}).get(r["task_id"])

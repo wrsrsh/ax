@@ -10,5 +10,19 @@
   },
   "source": "https://azure.microsoft.com/en-us/blog/gpt-6-astra-sol-and-luna-for-production-agents-in-microsoft-foundry/",
   "checked": "2026-09-26",
-  "notes": "global standard (pay-as-you-go), short-context rates. azure pricing page still shows placeholders for gpt-6 and points to the blog. cache writes are billed separately at $12.50/1M. long-context requests: $20 input / $2 cached / $25 cache write / $75 output; threshold not stated on any official page checked (third parties say >272k input tokens, whole request). us data zone is +10% ($11/$1.10/$55), eu data zone is +20% ($12/$1.20/$60). reasoning tokens bill as output (learn.microsoft.com reasoning doc). no per-token difference by reasoning effort; medium just changes how many tokens get spent. no per-request minimum found. context window 1,050,000 (922k in / 128k out). openai direct api matches: $10 / $1 / $50 standard."
+  "notes": "global standard (pay-as-you-go), short-context rates. azure pricing page still shows placeholders for gpt-6 and points to the blog. cache writes are billed separately at $12.50/1M. long-context requests: $20 input / $2 cached / $25 cache write / $75 output; threshold not stated on any official page checked (third parties say >272k input tokens, whole request). us data zone is +10% ($11/$1.10/$55), eu data zone is +20% ($12/$1.20/$60). reasoning tokens bill as output (learn.microsoft.com reasoning doc). no per-token difference by reasoning effort; medium just changes how many tokens get spent. no per-request minimum found. context window 1,050,000 (922k in / 128k out). openai direct api matches: $10 / $1 / $50 standard.",
+  "models": {
+    "claude-opus-5": {
+      "provider": "anthropic",
+      "per_million": {
+        "input": 5.0,
+        "cached_input": 0.5,
+        "output": 25.0,
+        "cache_write": 6.25
+      },
+      "source": "claude api model table: claude-opus-5 $5 in / $25 out; cache reads 0.1x input, 5-minute cache writes 1.25x input",
+      "checked": "2026-09-27",
+      "notes": "anthropic first-party rates (foundry bills the same). claude code 2.1.283 reports the same total_cost_usd for the fake api's usage, so its own price table agrees. claude code writes the prompt cache with the 5-minute ttl (1-hour writes would be 2x). thinking tokens bill as output. not checked against the live pricing page."
+    }
+  }
 }
