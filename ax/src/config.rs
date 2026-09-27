@@ -10,6 +10,7 @@
 //! | AX_MAX_HITS=n        | 50      | grep/find/refs hit cap                  |
 //! | AX_READ_WINDOW=n     | 200     | lines per read window                   |
 //! | AX_LONG_FILE=n       | 300     | files longer than this get an outline   |
+//! | AX_DIFF_LINES=n      | 40      | hunk lines `ax diff` shows before cutting |
 //! | AX_MAX_BYTES=n       | 24000   | text output cap per call (~7k tokens)   |
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -22,6 +23,7 @@ pub struct Config {
     pub max_hits: usize,
     pub read_window: usize,
     pub long_file: usize,
+    pub diff_lines: usize,
     pub max_bytes: usize,
 }
 
@@ -36,6 +38,7 @@ impl Default for Config {
             max_hits: 50,
             read_window: 200,
             long_file: 300,
+            diff_lines: 40,
             max_bytes: 24_000,
         }
     }
@@ -64,6 +67,7 @@ impl Config {
             max_hits: num("AX_MAX_HITS", d.max_hits),
             read_window: num("AX_READ_WINDOW", d.read_window),
             long_file: num("AX_LONG_FILE", d.long_file),
+            diff_lines: num("AX_DIFF_LINES", d.diff_lines),
             max_bytes: num("AX_MAX_BYTES", d.max_bytes),
         }
     }
