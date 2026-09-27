@@ -17,16 +17,18 @@ from datetime import datetime
 from pathlib import Path
 from statistics import mean
 
+from ax_eval.parse import COST_PARTS, cost_parts
+from ax_eval.runner import load_prices
 from ax_eval.util import RUNS, TASKS, jsonl
 
 MANIFEST = [
-    "run_id", "task_id", "setup", "rep", "seed", "agent", "codex_version", "model", "effort",
+    "run_id", "task_id", "setup", "rep", "seed", "agent", "codex_version", "claude_version", "model", "effort",
     "ax_commit", "image", "started", "ended", "exit_code", "timed_out", "infra_failure", "infra_reason",
 ]
 GRADE = ["resolved", "f2p_passed", "f2p_total", "p2p_passed", "p2p_total", "grade_seconds"]
 METRICS = [
-    "input_tokens", "cached_input_tokens", "uncached_input_tokens", "output_tokens", "reasoning_tokens",
-    "tool_calls", "failed_commands", "failed_patches", "fallback_rate", "script_calls", "ax_rejections", "cost", "completed",
+    "input_tokens", "cached_input_tokens", "cache_write_input_tokens", "uncached_input_tokens", "output_tokens", "reasoning_tokens",
+    "tool_calls", "failed_commands", "failed_patches", "fallback_rate", "script_calls", "ax_rejections", "cost", *COST_PARTS, "completed",
 ]
 DICTS = ["tools", "ax_calls", "ax_outcomes"]
 COLUMNS = MANIFEST + ["split", "dry"] + GRADE + ["grade_error", "failing"] + METRICS + [
@@ -60,7 +62,7 @@ def splits(tasks: Path = TASKS / "final.jsonl") -> dict[str, str]:
     return {t["id"]: t.get("set") for t in jsonl(tasks)} if tasks.exists() else {}
 
 
-def row(run: Path, split: dict[str, str] | None = None) -> dict:
+def row(run: Path, split: dict[str, str] | None = None, prices: dict | None = None) -> dict:
     m, g, x = (_load(run / f) for f in ("manifest.json", "grade.json", "metrics.json"))
     missing = [f for f, d in (("manifest.json", m), ("grade.json", g), ("metrics.json", x)) if d is None]
     if not (run / "events.jsonl").exists():
@@ -71,8 +73,8 @@ def row(run: Path, split: dict[str, str] | None = None) -> dict:
     r["run_id"] = r["run_id"] or run.name
     # the runner writes the task under "task"
     r["task_id"] = m.get("task_id") or m.get("task")
-    # stub runs and codex against the fake api cost nothing and prove nothing
-    r["dry"] = m.get("agent") != "codex" or any(h in (m.get("api_base_url") or "") for h in ("host.docker.internal", "127.0.0.1", "localhost"))
+    # stub runs and codex / claude against a fake api cost nothing and prove nothing
+    r["dry"] = m.get("agent") not in ("codex", "claude") or any(h in (m.get("api_base_url") or "") for h in ("host.docker.internal", "127.0.0.1", "localhost"))
     r["timed_out"] = bool(r["timed_out"])
     r["infra_failure"] = bool(r["infra_failure"])
     r["split"] = (split or {}).get(r["task_id"])
@@ -80,6 +82,9 @@ def row(run: Path, split: dict[str, str] | None = None) -> dict:
     r["grade_error"] = g.get("error")
     r["failing"] = g.get("failing") or []
     r.update({k: x.get(k) for k in METRICS})
+    if any(r[k] is None for k in COST_PARTS) and None not in (r["uncached_input_tokens"], r["cached_input_tokens"], r["output_tokens"]):
+        # metrics.json from before the split: same formula as parse.cost, today's prices.json
+        r.update(cost_parts(r, load_prices() if prices is None else prices))
     r["agent_error"] = x.get("error")
     for k in DICTS:
         r[k] = x.get(k) or {}
@@ -136,7 +141,16 @@ def collect(runs_dir: Path = RUNS, report_dir: Path | None = None, tasks: Path =
     report_dir = Path(report_dir) if report_dir else runs_dir.parent / "report"
     split = splits(tasks)
     dirs = sorted(d for d in runs_dir.iterdir() if d.is_dir() and not d.name.startswith(".")) if runs_dir.exists() else []
-    rows = [row(d, split) for d in dirs]
+    prices: dict[str, dict] = {}
+
+    def priced(d: Path) -> dict:
+        m = _load(d / "manifest.json") or {}
+        model = m.get("model") or "gpt-6-astra"
+        if model not in prices:
+            prices[model] = load_prices(model=model)
+        return row(d, split, prices[model])
+
+    rows = [priced(d) for d in dirs]
 
     runs_dir.mkdir(parents=True, exist_ok=True)
     with (runs_dir / "runs.jsonl").open("w") as f:

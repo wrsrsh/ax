@@ -1,6 +1,6 @@
 //! `ax diff [--full|--stat] [paths…]`: what changed vs HEAD, in one bounded shot.
 //! status + per-file +/- counts, untracked files with line counts, then the
-//! hunks, capped at one read window unless --full.
+//! hunks, capped at AX_DIFF_LINES (40) unless --full.
 
 use crate::output::{Report, Summary};
 use crate::{AxError, Ctx, Result, text};
@@ -147,7 +147,7 @@ pub fn run(ctx: &Ctx, full: bool, stat: bool, paths: &[String]) -> Result<Report
     let cap = if full || !ctx.cfg.caps {
         usize::MAX
     } else {
-        ctx.cfg.read_window
+        ctx.cfg.diff_lines
     };
     let shown = if stat { 0 } else { patch_lines.len().min(cap) };
     if shown > 0 {
@@ -163,7 +163,7 @@ pub fn run(ctx: &Ctx, full: bool, stat: bool, paths: &[String]) -> Result<Report
         text.push_str(" stat only; `ax diff` for the hunks.");
     } else if shown < patch_lines.len() {
         text.push_str(&format!(
-            " showed {shown} of {} diff lines; --full for all, or `ax diff <path>` for one file.",
+            " showed {shown} of {} diff lines; --stat for just the per-file counts, --full for every hunk, or `ax diff <path>` for one file.",
             patch_lines.len()
         ));
     }

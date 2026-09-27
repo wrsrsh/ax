@@ -22,3 +22,4 @@ Leave generated files, lockfiles and vendored code alone unless the task is abou
 Keep commits focused: one logical change, with the reason in the message, and no stray debug output or commented-out code left behind.
 When a test fails, read the assertion and the code under test before changing either; the test is usually right.
 Prefer reading the code that is there over guessing how it probably works; names in this repository are not always what they seem, and older modules may follow different conventions than newer ones.
+A fix that touches many files is often a sign that the problem sits somewhere other than where it first showed up, so it is usually worth a second look.

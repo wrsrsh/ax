@@ -1,17 +1,20 @@
-"""run codex against the fake api and keep what it printed. used to make parser
-fixtures and to check which tools a setup exposes, without any model calls."""
+"""run codex (or claude code) against a fake api and keep what it printed. used
+to make parser fixtures and to check which tools a setup exposes, without any
+model calls."""
 
 from __future__ import annotations
 
 import json
 import os
 import re
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
 
+from ax_eval import fakeapi_anthropic
 from ax_eval.fakeapi import Script, serve
-from ax_eval.setups import codex_args, write_codex_home
+from ax_eval.setups import claude_args, codex_args, write_codex_home
 
 
 def _clean_env() -> dict[str, str]:
@@ -37,6 +40,37 @@ def run(steps: list[str], repo: Path, catalog: Path, extra_path: str = "", setup
         events = [json.loads(l) for l in out.splitlines() if l.startswith("{")]
         reqs = [json.loads(l) for l in rec.read_text().splitlines()] if rec.exists() else []
         return events, reqs
+
+
+def run_claude(steps: list[str], repo: Path, setup: str = "B", *, model: str = "claude-opus-5", effort: str = "medium",
+               max_turns: int = 20, extra_path: str = "", env_extra: dict | None = None) -> tuple[list[dict], list[dict]]:
+    """(claude stream-json events, recorded request bodies) for the host's claude
+    against the fake messages api. the env is built from nothing: running this
+    from inside a claude code session must not hand it that session's vars."""
+    with tempfile.TemporaryDirectory(dir=Path.home()) as tmp:
+        rec = Path(tmp) / "req.jsonl"
+        srv, port = fakeapi_anthropic.serve(fakeapi_anthropic.Script(steps, rec))
+        try:
+            (Path(tmp) / "claude-home").mkdir()
+            path = os.environ.get("PATH", "/usr/bin:/bin")
+            env = {
+                "PATH": f"{extra_path}:{path}" if extra_path else path, "HOME": tmp, "LANG": "C.UTF-8",
+                "CLAUDE_CONFIG_DIR": f"{tmp}/claude-home", "DISABLE_AUTOUPDATER": "1", "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+                "ANTHROPIC_BASE_URL": f"http://127.0.0.1:{port}", "ANTHROPIC_API_KEY": "dummy", **(env_extra or {}),
+            }
+            args = [shutil.which("claude") or "claude", *claude_args(setup, model, effort, max_turns)]
+            out = subprocess.run(args, env=env, cwd=repo, input="go", capture_output=True, text=True, timeout=120).stdout
+        finally:
+            srv.shutdown()
+        events = [json.loads(l) for l in out.splitlines() if l.startswith("{")]
+        reqs = [json.loads(l) for l in rec.read_text().splitlines()] if rec.exists() else []
+        return events, reqs
+
+
+def claude_tools(reqs: list[dict]) -> list[str]:
+    """tool names claude code offered in its first agent request."""
+    agent = [r["body"] for r in reqs if r.get("method") == "POST" and fakeapi_anthropic.offers_bash(r.get("body") or {})]
+    return [t["name"] for t in agent[0].get("tools", [])] if agent else []
 
 
 def nested_tools(reqs: list[dict]) -> list[str]:

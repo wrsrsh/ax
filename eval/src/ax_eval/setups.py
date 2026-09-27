@@ -11,6 +11,10 @@ that key gives the model plain function tools again. no feature flag does it.
 
 config.toml never holds a secret: the provider reads its key from `env_key`
 at run time.
+
+claude code runs A/B/C only (code mode is a codex thing). the same note goes in
+as CLAUDE.md, and C takes away its edit tools instead of apply_patch. see
+claude_args and eval/report/claude_code_agent.md.
 """
 
 from __future__ import annotations
@@ -51,6 +55,11 @@ def base_of(setup: str) -> str:
 
 def agents_md(setup: str) -> str:
     return (NOTES / ("AGENTS.ax.md" if uses_ax(setup) else "AGENTS.placebo.md")).read_text()
+
+
+def note_name(agent: str) -> str:
+    """where the note goes in /w: codex reads AGENTS.md, claude code CLAUDE.md."""
+    return "CLAUDE.md" if agent == "claude" else "AGENTS.md"
 
 
 def _s(v: str) -> str:
@@ -147,4 +156,41 @@ def codex_args(setup: str) -> list[str]:
     args = ["--json", "--ephemeral", "--ignore-rules", "--skip-git-repo-check", "--dangerously-bypass-approvals-and-sandbox"]
     for f in DISABLED:
         args += ["--disable", f]
+    return args
+
+
+# claude code 2.1.283. the default -p tool list also has Agent, Cron*,
+# Enter/ExitWorktree, ListAgents, NotebookEdit, ReportFindings, ScheduleWakeup,
+# SendMessage, Skill, TaskStop, WebFetch, WebSearch and Workflow. those go, the
+# way codex loses multi_agent, browser_use and friends. Glob and Grep aren't on
+# by default in this version but still exist, so they're asked for by name.
+# MultiEdit and TodoWrite are gone (asking for them is silently ignored).
+CLAUDE_TOOLS = ("Bash", "Read", "Edit", "Write", "Glob", "Grep")
+CLAUDE_EDIT_TOOLS = ("Edit", "Write", "MultiEdit", "NotebookEdit")
+CLAUDE_SETTINGS = {"autoMemoryEnabled": False}
+
+
+def claude_tools(setup: str) -> list[str]:
+    if raw_tools(setup):
+        raise ValueError(f"setup {setup} is codex-only (code mode)")
+    drop = CLAUDE_EDIT_TOOLS if setup == "C" else ()
+    return [t for t in CLAUDE_TOOLS if t not in drop]
+
+
+def claude_args(setup: str, model: str, effort: str, max_turns: int, max_budget_usd: float | None = None) -> list[str]:
+    """flags for `claude -p`, prompt on stdin. run with CLAUDE_CONFIG_DIR set to an
+    empty dir. only project settings load (that's also what reads /w/CLAUDE.md),
+    no mcp servers, no skills, no auto-memory."""
+    args = [
+        "-p", "--output-format", "stream-json", "--verbose",
+        "--model", model, "--effort", effort, "--max-turns", str(int(max_turns)),
+        "--permission-mode", "bypassPermissions",
+        "--strict-mcp-config", "--setting-sources", "project", "--settings", json.dumps(CLAUDE_SETTINGS),
+        "--disable-slash-commands", "--no-session-persistence",
+        "--tools", ",".join(claude_tools(setup)),
+    ]
+    if setup == "C":
+        args += ["--disallowedTools", ",".join(CLAUDE_EDIT_TOOLS)]
+    if max_budget_usd is not None:
+        args += ["--max-budget-usd", f"{max_budget_usd:g}"]
     return args

@@ -431,7 +431,7 @@ def run_chain(
 
             cmd, stdin = step_cmd(agent, setup, name, t, m["thread_id"], env_key, model, effort, cap)
             ts0 = time.time()
-            code, timed_out, capped, secs = drive(cmd, stdin, name, sd, time_cap_s, turn_cap, on_item if m["jolt"] else None)
+            code, timed_out, capped, secs = drive(cmd, stdin, name, sd, time_cap_s, turn_cap, on_item=on_item if m["jolt"] else None)
             docker("exec", name, "chown", "-R", f"{os.getuid()}:{os.getgid()}", "/out", check=False)
             if (box / "ax_log.jsonl").exists():
                 shutil.move(box / "ax_log.jsonl", sd / "ax_log.jsonl")
@@ -473,8 +473,8 @@ def run_chain(
         shutil.rmtree(stage, ignore_errors=True)
         shutil.rmtree(box, ignore_errors=True)
 
-    prices = prices or load_prices()
-    raw = [metrics(out_dir / f"step{s['step']}" / "events.jsonl", out_dir / f"step{s['step']}" / "ax_log.jsonl") for s in steps]
+    prices = prices or load_prices(model=model)
+    raw = [metrics(out_dir / f"step{s['step']}" / "events.jsonl", out_dir / f"step{s['step']}" / "ax_log.jsonl", agent=agent) for s in steps]
     for step, mt in zip(steps, per_step_usage(raw, prices)):
         sd = out_dir / f"step{step['step']}"
         (sd / "metrics.json").write_text(json.dumps(mt, indent=1) + "\n")
@@ -689,7 +689,7 @@ def main(argv: list[str] | None = None) -> int:
 
     dry = a.agent == "stub" or a.dry_run
     kw: dict = dict(agent=a.agent, time_cap_s=a.time_cap, turn_cap=a.turn_cap, model=a.model, effort=a.effort,
-                    catalog_src=a.catalog, prices=load_prices(), jolt=a.jolt)
+                    catalog_src=a.catalog, prices=load_prices(model=a.model), jolt=a.jolt)
     run_fn = run_chain
     if a.agent == "codex":
         if a.dry_run:

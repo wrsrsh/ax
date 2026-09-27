@@ -62,3 +62,15 @@ def test_agent_image_runs():
     # cached: same binary, no rebuild
     assert images.agent_image(task_image, True, ax_bin) == tag
     assert json.dumps(images.image_labels(tag)) == json.dumps(labels)
+
+
+def test_claude_image():
+    assert agent_tag("ax-hono-deps:c83c3031a376", True, "claude") == "ax-agent:c83c3031a376-claude-ax"
+    assert agent_tag("ax-hono-deps:c83c3031a376", False, "claude") == "ax-agent:c83c3031a376-claude-noax"
+    with pytest.raises(ValueError):
+        agent_tag("ax-hono-deps:x", True, "gemini")
+    d = dockerfile("ax-hono-deps:x", True, {"org.ax.claude": images.CLAUDE_VERSION}, "claude")
+    assert f"@anthropic-ai/claude-code@{images.CLAUDE_VERSION} " in d and "@openai/codex" not in d
+    assert [l for l in d.splitlines() if l.startswith(("COPY", "ADD"))] == ["COPY ax /usr/local/bin/ax"]
+    # codex's dockerfile is what it was
+    assert dockerfile("ax-hono-deps:x", False, {}) == dockerfile("ax-hono-deps:x", False, {}, "codex")

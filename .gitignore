@@ -3,6 +3,7 @@ ax/target/
 __pycache__/
 *.pyc
 eval/runs/*/
+eval/runs-claude/*/
 !eval/runs/.gitkeep
 eval/runs-long/
 eval/.cache/

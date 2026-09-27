@@ -8,8 +8,8 @@ then we actually check whether it helps. `eval/` runs codex on real tasks from a
 
 ## commands
 
-- `ax map` – one-screen overview of a repo
-- `ax find` – files by name or rg-style glob
+- `ax map [dir]` – one-screen overview of a repo, or of one dir in it
+- `ax find <name|glob> [paths]` – files by name or rg-style glob, and if nothing matches it tells you about gitignored ones that would
 - `ax grep` – rg-compatible search, hits grouped by file and enclosing function
 - `ax outline`, `ax def`, `ax refs` – symbols, name-based
 - `ax read` – files or line ranges, with `LINE:HASH` anchors
@@ -23,7 +23,7 @@ then we actually check whether it helps. `eval/` runs codex on real tasks from a
 
 ## eval
 
-every step is `uv run python -m ax_eval.<step>` from `eval/`. `mine` pulls merged hono PRs and splits each diff into a gold patch and hidden tests. `validate` runs those in docker and keeps tasks with real fail-to-pass tests. `statements` writes the instructions and the dev/held-out split. `runner` runs codex on each task per setup (`eval/setups` has the ax note and a placebo matched to it in tokens; `Ar`/`Br`/`Cr` are the same three with codex's code mode off, see `eval/report/codex_tools.md`). `grade` applies the agent's diff plus the hidden tests in a fresh container, and the hidden tests always win. `table` and `report` turn the runs into numbers. `fakeapi` stands in for the model so all of it can run without api calls, and `parity` / `patch_parity` check ax against rg and git apply. `chains` + `longrun` are the long-session version: a few tasks back to back in one codex thread, with the files changing under the agent in between (`eval/report/long_session_design.md`). output goes to `eval/tasks`, `eval/runs` and `eval/report`.
+every step is `uv run python -m ax_eval.<step>` from `eval/`. `mine` pulls merged hono PRs and splits each diff into a gold patch and hidden tests. `validate` runs those in docker and keeps tasks with real fail-to-pass tests. `statements` writes the instructions and the dev/held-out split. `runner` runs codex on each task per setup (`eval/setups` has the ax note and a placebo matched to it in tokens; `Ar`/`Br`/`Cr` are the same three with codex's code mode off, see `eval/report/codex_tools.md`). `grade` applies the agent's diff plus the hidden tests in a fresh container, and the hidden tests always win. `table` and `report` turn the runs into numbers, and `audit` goes through every shell line that called ax to say which failures were really ax's. `fakeapi` stands in for the model so all of it can run without api calls, and `parity` / `patch_parity` check ax against rg and git apply. claude code can be the agent too (`--agent claude`, same A/B/C, note goes in as CLAUDE.md, `fakeapi_anthropic` fakes the messages api); notes in `eval/report/claude_code_agent.md`. `chains` + `longrun` are the long-session version: a few tasks back to back in one codex thread, with the files changing under the agent in between (`eval/report/long_session_design.md`). output goes to `eval/tasks`, `eval/runs` and `eval/report`.
 
 ## dev
 
@@ -32,6 +32,6 @@ cd ax && cargo test
 cd eval && uv run --dev pytest
 ```
 
-the grade tests skip unless docker, the task images and `eval/.cache/hono-full` are around; the capture test needs codex.
+the grade tests skip unless docker, the task images and `eval/.cache/hono-full` are around; the capture tests need codex, and claude code 2.1.283 for the claude one.
 
 planning + tracking lives in linear (team hug, project "ax: agent file CLI + benchmark"), not here. the code in here is just code.

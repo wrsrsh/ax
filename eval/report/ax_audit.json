@@ -1,0 +1,177 @@
+{
+  "runs": 360,
+  "runs_by_setup": {
+    "A": 120,
+    "B": 120,
+    "C": 120
+  },
+  "commands": 4851,
+  "ax_commands": 2405,
+  "ax_commands_nonzero": 143,
+  "blamed_on_ax": 28,
+  "blamed_on_ax_by": {
+    "ax is the last segment": 27,
+    "output starts with an ax error": 1
+  },
+  "blamed_on_ax_by_setup": {
+    "B": 10,
+    "C": 18
+  },
+  "blamed_on_later": 115,
+  "blamed_on_later_where": {
+    "after ax": 114,
+    "before ax": 1
+  },
+  "later_commands": {
+    "bun run test": 55,
+    "bunx vitest": 28,
+    "bun run vitest": 7,
+    "bun x vitest": 5,
+    "bunx tsc": 5,
+    "npx vitest": 5,
+    "node": 4,
+    "bunx prettier": 3,
+    "git": 2,
+    "vitest": 1
+  },
+  "failures": {
+    "ax grep": {
+      "usage error": 7,
+      "missing path": 2
+    },
+    "ax read": {
+      "missing path": 6
+    },
+    "ax find": {
+      "usage error": 5
+    },
+    "ax edit": {
+      "stale anchor": 3,
+      "no match": 1
+    },
+    "ax write": {
+      "usage error": 2
+    },
+    "ax map": {
+      "usage error": 1
+    },
+    "ax outline": {
+      "missing path": 1
+    }
+  },
+  "examples": {
+    "usage error": [
+      {
+        "run_id": "20260926T163102-hono-5094-B-r2-236d",
+        "command": "ax map src/adapter/lambda-edge runtime-tests/lambda-edge",
+        "output": "error: unexpected argument 'runtime-tests/lambda-edge' found"
+      },
+      {
+        "run_id": "20260926T164509-hono-5380-B-r0-8648",
+        "command": "ax find '*test*' src/jsx && ax diff --stat",
+        "output": "error: unexpected argument 'src/jsx' found"
+      },
+      {
+        "run_id": "20260926T164648-hono-5268-C-r0-fc79",
+        "command": "ax read src/request.test.ts:1-220; ax grep 'notFound|param\\(' src/hono.test.ts -m 15",
+        "output": "error: unexpected argument '-m' found"
+      }
+    ],
+    "stale anchor": [
+      {
+        "run_id": "20260926T163149-hono-5288-C-r2-dd5e",
+        "command": "ax edit src/request.ts <<'EOF' \u23ce @@ replace 485:ff79..487:3a48 \u23ce EOF",
+        "output": "src/request.ts: stale anchor 487:3a48: that line changed since you read it. current lines:"
+      },
+      {
+        "run_id": "20260926T164234-hono-5099-C-r2-1e46",
+        "command": "ax edit src/adapter/lambda-edge/handler.test.ts <<'EOF' \u23ce @@ insert before 1:4c30 \u23ce EOF",
+        "output": "src/adapter/lambda-edge/handler.test.ts: stale anchor 1:4c30: that line changed since you read it. current lines:"
+      },
+      {
+        "run_id": "20260926T164234-hono-5099-C-r2-1e46",
+        "command": "ax edit src/adapter/lambda-edge/handler.ts <<'EOF' \u23ce @@ replace 150:1b9e \u23ce EOF",
+        "output": "src/adapter/lambda-edge/handler.ts: stale anchor 150:1b9e: that line changed since you read it. current lines:"
+      }
+    ],
+    "no match": [
+      {
+        "run_id": "20260926T164714-hono-5379-C-r0-6d94",
+        "command": "ax edit src/utils/jwt/jwt.test.ts <<'EOF' \u23ce @@ find \u23ce describe('verifyWithJwks security', () => { \u23ce @@ with \u23ce describe(\u2026",
+        "output": "src/utils/jwt/jwt.test.ts: find text \" describe('verifyWithJwks security', () => {\" isn't in the file exactly. closest: "
+      }
+    ],
+    "missing path": [
+      {
+        "run_id": "20260926T163844-hono-5205-C-r1-70c8",
+        "command": "ax read src/middleware/etag/digest.ts src/middleware/etag/digest.test.ts vitest.config.ts src/middleware/etag/index.tes\u2026",
+        "output": "src/middleware/etag/digest.test.ts: no such file or directory (os error 2)"
+      },
+      {
+        "run_id": "20260926T164714-hono-5379-C-r0-6d94",
+        "command": "ax grep 'spyOn|restoreAllMocks|SignatureMismatched' src/utils/jwt/jwt.test.ts src/middleware/jwt/jwt.test.ts",
+        "output": "ax: no such path: src/middleware/jwt/jwt.test.ts"
+      },
+      {
+        "run_id": "20260926T165341-hono-5204-C-r1-f744",
+        "command": "ax read src/jsx/intrinsic-element/components.ts src/jsx/intrinsic-element/index.ts && ax find '*intrinsic*' && ax grep \u2026",
+        "output": "src/jsx/intrinsic-element/index.ts: no such file or directory (os error 2)"
+      }
+    ]
+  },
+  "first_command_ax_map": {
+    "A": 0,
+    "B": 120,
+    "C": 120
+  },
+  "first_ax_command_ax_map": {
+    "A": 0,
+    "B": 120,
+    "C": 120
+  },
+  "runs_with_ax_find_agents_md": {
+    "A": 0,
+    "B": 120,
+    "C": 115
+  },
+  "ax_log": {
+    "lines": 2903,
+    "corrupt": 12,
+    "nonzero": 20,
+    "nonzero_by_cmd": {
+      "read": 10,
+      "edit": 4,
+      "write": 3,
+      "grep": 2,
+      "outline": 1
+    },
+    "nonzero_by_outcome": {
+      "none": 10,
+      "error": 6,
+      "stale": 3,
+      "no-match": 1
+    }
+  },
+  "output_lines": {
+    "edit": {
+      "calls": 487,
+      "median": 14,
+      "mean": 24.4
+    },
+    "read": {
+      "calls": 478,
+      "median": 286.5,
+      "mean": 328.1
+    },
+    "diff": {
+      "calls": 193,
+      "median": 73,
+      "mean": 70.5
+    },
+    "map": {
+      "calls": 253,
+      "median": 50,
+      "mean": 48.0
+    }
+  }
+}

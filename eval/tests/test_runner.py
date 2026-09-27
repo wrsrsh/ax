@@ -5,7 +5,7 @@ import subprocess
 import pytest
 
 from ax_eval import runner
-from ax_eval.images import image_labels
+from ax_eval.images import CLAUDE_VERSION, image_labels
 from ax_eval.runner import Budget, BudgetExceeded, est_from_ledger, infra_reason, load_prices, plan, read_ledger, run_batch, spent
 
 TASKS = [{"id": f"t{i}"} for i in range(3)]
@@ -136,9 +136,24 @@ def test_infra_reason():
 def test_prices(tmp_path, capsys):
     assert load_prices(tmp_path / "nope.json") == {"input": 0.0, "cached_input": 0.0, "cache_write": 0.0, "output": 0.0}
     assert "warning" in capsys.readouterr().err
+    # old flat one-model shape still reads
     (tmp_path / "p.json").write_text('{"per_million": {"input": 1.25, "cached_input": 0.125, "output": 10}}')
     p = load_prices(tmp_path / "p.json")
     assert p["output"] == 10.0 and p["cache_write"] == 0.0
+    (tmp_path / "flat.json").write_text('{"model": "gpt-6-astra", "per_million": {"input": 10}}')
+    assert load_prices(tmp_path / "flat.json")["input"] == 10.0
+    assert load_prices(tmp_path / "flat.json", model="gpt-6-luna")["input"] == 0.0
+    assert "gpt-6-luna" in capsys.readouterr().err
+    # multi-model shape, default model is gpt-6-astra
+    (tmp_path / "multi.json").write_text(json.dumps({"currency": "USD", "models": {
+        "gpt-6-astra": {"per_million": {"input": 10, "cached_input": 1, "cache_write": 12.5, "output": 50}},
+        "gpt-6-luna": {"per_million": {"input": 0.1, "cached_input": 0.01, "cache_write": 0.125, "output": 0.5}},
+    }}))
+    assert load_prices(tmp_path / "multi.json") == {"input": 10.0, "cached_input": 1.0, "cache_write": 12.5, "output": 50.0}
+    assert load_prices(tmp_path / "multi.json", model="gpt-6-luna")["cache_write"] == 0.125
+    capsys.readouterr()
+    assert load_prices(tmp_path / "multi.json", model="gpt-nope") == dict.fromkeys(("input", "cached_input", "cache_write", "output"), 0.0)
+    assert "warning" in capsys.readouterr().err
 
 
 def test_cli_refuses_unapproved_paid_runs(capsys):
@@ -215,4 +230,73 @@ def test_probe_catches_leaks(tmp_path):
     fails = [l for l in r.stdout.splitlines() if l.startswith("FAIL")]
     assert r.returncode == 1
     for bit in ("host codex config", "mcp servers", "ax missing", "AGENTS.md", "LEAKED", "mounts"):
+        assert any(bit in l for l in fails), (bit, fails)
+
+
+def test_prices_per_model(capsys):
+    assert load_prices(model="claude-opus-5") == {"input": 5.0, "cached_input": 0.5, "cache_write": 6.25, "output": 25.0}
+    assert load_prices(model="gpt-6-astra") == load_prices()
+    assert load_prices(model="claude-nope") == dict.fromkeys(("input", "cached_input", "cache_write", "output"), 0.0)
+    assert "no prices for claude-nope" in capsys.readouterr().err
+
+
+def test_estimate_is_per_agent():
+    rows = [{"agent": "codex", "cost": 2.0}, {"agent": "claude", "cost": 1.0}, {"agent": "claude", "cost": 3.0}]
+    assert est_from_ledger(rows) == 2.0 and est_from_ledger(rows, "claude") == 2.0
+    assert runner.claude_key_var("ANTHROPIC_API_KEY") == runner.claude_key_var("MY_KEY") == "ANTHROPIC_API_KEY"
+    assert runner.claude_key_var("ANTHROPIC_AUTH_TOKEN") == "ANTHROPIC_AUTH_TOKEN"
+
+
+def test_cli_claude_guards(capsys, monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    for argv, bit in [
+        (["--agent", "claude"], "--paid"),
+        (["--agent", "claude", "--paid"], "ANTHROPIC_API_KEY"),
+        (["--agent", "claude", "--dry-run", "--setups", "Br"], "A B C only"),
+    ]:
+        with pytest.raises(SystemExit):
+            runner.main(["--tasks", "dev", *argv])
+        assert bit in capsys.readouterr().err, argv
+
+
+@pytest.mark.docker
+@needs_docker
+@pytest.mark.parametrize("setup", ["A", "B", "C"])
+def test_claude_against_fake_api(setup, tmp_path):
+    zero = {"input": 0, "cached_input": 0, "output": 0}
+    m = runner.with_fake_api()(DEV, setup, f"test-claude-{setup}", tmp_path / "run", agent="claude", model="claude-opus-5",
+                               prices=zero, time_cap_s=120)
+    d = tmp_path / "run"
+    assert not m["infra_failure"], m["infra_reason"]
+    assert m["claude_version"].startswith(CLAUDE_VERSION) and m["codex_version"] is None
+    assert m["image"].endswith(f"-claude-{'noax' if setup == 'A' else 'ax'}") and m["turn_cap"] == runner.CLAUDE_TURNS
+    assert "FAIL" not in (d / "probe.log").read_text() and "CLAUDE.md matches" in (d / "probe.log").read_text()
+    diff = (d / "final.diff").read_text()
+    assert "+// ax-eval fake" in diff and "CLAUDE.md" not in diff and ".claude" not in diff
+    mt = json.loads((d / "metrics.json").read_text())
+    assert mt["agent"] == "claude" and mt["completed"] and mt["tool_calls"] == 2
+    assert mt["tools"].get("ax read" if setup != "A" else "head") == 1 and mt["tools"].get("sed") == 1
+    init = json.loads((d / "events.jsonl").read_text().splitlines()[0])
+    assert init["cwd"] == "/w" and init["mcp_servers"] == []
+    assert ("Edit" in init["tools"]) == (setup != "C") and "Bash" in init["tools"]
+
+
+@pytest.mark.docker
+@needs_docker
+def test_probe_catches_claude_leaks(tmp_path):
+    """the claude probe fails on a host ~/.claude, a key in the env, project settings and a stray AGENTS.md."""
+    home = tmp_path / "claude"
+    home.mkdir()
+    (home / "settings.json").write_text("{}")
+    image = runner.agent_image(DEV["image"], False, agent="claude")
+    script = "mkdir -p /w/.claude; touch /w/AGENTS.md; bash /probe.sh"
+    r = subprocess.run(
+        ["docker", "run", "--rm", "-v", f"{home}:/root/.claude", "-v", f"{runner.SCRIPTS / 'probe.sh'}:/probe.sh:ro",
+         "-e", "ANTHROPIC_API_KEY=sk-leak", "-e", "PROBE_AGENT=claude", "-e", "PROBE_NOTE=CLAUDE.md", "-e", "PROBE_SETUP=A",
+         "-e", f"PROBE_BASE={DEV['base']}", "-e", "PROBE_AGENTS_SHA=x", "--entrypoint", "bash", image, "-c", script],
+        capture_output=True, text=True,
+    )
+    fails = [l for l in r.stdout.splitlines() if l.startswith("FAIL")]
+    assert r.returncode == 1
+    for bit in ("host claude state", "CLAUDE_CONFIG_DIR", "/w/.claude", "AGENTS.md present", "ANTHROPIC_API_KEY", "CLAUDE.md mismatch"):
         assert any(bit in l for l in fails), (bit, fails)

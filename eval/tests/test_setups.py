@@ -96,4 +96,36 @@ def test_notes_token_parity():
     except Exception as e:  # encoding not cached and no network
         pytest.skip(str(e))
     a, b = len(enc.encode(agents_md("A"))), len(enc.encode(agents_md("B")))
-    assert abs(a - b) <= 0.05 * max(a, b), (a, b)
+    assert a == b, (a, b)
+
+
+def test_ax_note_leaves_agents_md_alone():
+    # agents already burn calls on `ax find AGENTS.md`, don't nudge them further
+    assert "AGENTS.md" not in agents_md("B")
+
+
+def _flag(args, f):
+    return args[args.index(f) + 1]
+
+
+def test_claude_args():
+    a, c = setups.claude_args("A", "claude-opus-5", "medium", 50), setups.claude_args("C", "claude-opus-5", "medium", 50)
+    assert setups.claude_args("B", "claude-opus-5", "medium", 50) == a
+    for flag in ("-p", "--verbose", "--strict-mcp-config", "--disable-slash-commands", "--no-session-persistence"):
+        assert flag in a
+    assert _flag(a, "--output-format") == "stream-json" and _flag(a, "--max-turns") == "50"
+    assert _flag(a, "--model") == "claude-opus-5" and _flag(a, "--effort") == "medium"
+    assert _flag(a, "--permission-mode") == "bypassPermissions" and _flag(a, "--setting-sources") == "project"
+    assert json.loads(_flag(a, "--settings")) == {"autoMemoryEnabled": False}
+    assert _flag(a, "--tools") == "Bash,Read,Edit,Write,Glob,Grep"
+    assert _flag(c, "--tools") == "Bash,Read,Glob,Grep"
+    assert set(_flag(c, "--disallowedTools").split(",")) >= {"Edit", "Write", "MultiEdit"}
+    assert "--disallowedTools" not in a and "--max-budget-usd" not in a
+    assert _flag(setups.claude_args("A", "m", "low", 5, 2.5), "--max-budget-usd") == "2.5"
+    with pytest.raises(ValueError):
+        setups.claude_args("Br", "m", "medium", 5)
+
+
+def test_note_name():
+    assert setups.note_name("codex") == setups.note_name("stub") == "AGENTS.md"
+    assert setups.note_name("claude") == "CLAUDE.md"

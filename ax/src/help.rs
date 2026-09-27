@@ -5,11 +5,11 @@ use serde_json::json;
 
 pub const NOTE: &str = "\
 ## ax
-`ax` is installed. Use it instead of cat/sed/grep/find/apply_patch for reading, searching and editing files.
-- `ax map` one-screen overview of the repo. start here.
-- `ax find <name|glob>` files (gitignore-aware). `ax grep <pattern> [paths]` takes rg flags (-F -w -i -t -g -C -l -c); hits come grouped by file and enclosing function.
-- `ax outline <file|dir>`, `ax def <sym>`, `ax refs <sym>`: symbols. name-based, not type-aware.
+`ax` is installed. Use it instead of cat/sed/grep/find/apply_patch to read, search and edit files.
 - `ax read <path[:a-b]>...` many files or ranges in one call. long files show an outline + the first 200 lines.
+- `ax grep <pattern> [paths]` takes rg flags (-F -w -i -t -g -C -l -c -m); hits are grouped by file and function. `ax find <name|glob> [paths]` lists files.
+- `ax outline <file|dir>...`, `ax def <sym>`, `ax refs <sym>`: symbols. name-based, not type-aware.
+- `ax map [path]`: optional overview when you don't know the repo.
 Every line comes back as `LINE:HASH  code`. The prefix isn't part of the line: never copy it into code or count it toward line width. Edits point at those anchors:
 ```
 ax edit src/app.ts <<'EOF'
@@ -24,8 +24,9 @@ exact old text (must match once)
 new text
 EOF
 ```
-`ax write <path> --if <hash>` replaces a whole file (new files need no --if), `ax patch` applies a Codex or unified patch from stdin, `--dry-run` previews any of them, `ax diff` shows your changes.
-Stale anchors, edits that break the syntax and failed patches write nothing and show you the current lines. Every command ends with one line saying what was cut and how to narrow.
+`ax edit` echoes only the changed lines, with new anchors. `ax write <path> --if <hash>` replaces a whole file (new files need no --if), `ax patch` applies a Codex or unified patch from stdin, `--dry-run` previews any of them.
+Check your work with `ax diff --stat`, and `ax diff <path>` for one file's hunks.
+Stale anchors, syntax-breaking edits and failed patches write nothing and show the current lines. Every command ends with one line saying what was cut and how to narrow.
 ";
 
 pub const ENV: &str = "\
@@ -37,6 +38,7 @@ AX_NO_RELOCATE=1     moved anchors are refused instead of found again
 AX_MAX_HITS=n        hit cap for grep/find/refs/def (50)
 AX_READ_WINDOW=n     lines per read window (200)
 AX_LONG_FILE=n       files longer than this get outline + window (300)
+AX_DIFF_LINES=n      hunk lines `ax diff` shows before cutting (40)
 AX_MAX_BYTES=n       text output cap per call, cut at line boundaries (24000)
 AX_LOG=<file>        append one json line per call
 ";
