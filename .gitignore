@@ -5,6 +5,7 @@ __pycache__/
 eval/runs/*/
 eval/runs-claude/*/
 !eval/runs/.gitkeep
-eval/runs-long/
+eval/runs-long*/
+eval/runs-v2/
 eval/.cache/
 .claude/worktrees/
