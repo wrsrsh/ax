@@ -15,14 +15,7 @@ pub fn git(root: &Path, args: &[&str]) {
     let ok = std::process::Command::new("git")
         .arg("-C")
         .arg(root)
-        .args([
-            "-c",
-            "user.name=t",
-            "-c",
-            "user.email=t@t",
-            "-c",
-            "init.defaultBranch=main",
-        ])
+        .args(["-c", "init.defaultBranch=main"])
         .args(args)
         .output()
         .unwrap()
